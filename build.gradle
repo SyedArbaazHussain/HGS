@@ -1,36 +1,4 @@
-/*
- * Copyright (C) 2026 Syed Arbaaz Hussain
- * Licensed under the GNU General Public License v3.0
- */
-
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        // Essential for Android 14+ and Gradle 8.0+
-        classpath 'com.android.tools.build:gradle:8.2.2'
-    }
-}
-
 plugins {
-    // This allows us to define the version in one place
     id 'com.android.application' version '8.2.2' apply false
     id 'com.android.library' version '8.2.2' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
-}
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        // Essential for Xposed API retrieval
-        maven { url 'https://api.xposed.info/' }
-        maven { url 'https://jcenter.bintray.com/' }
-    }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
 }
