@@ -1,6 +1,8 @@
 package com.hyperos.gesturefix;
 
+import android.content.ComponentName;
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
@@ -10,44 +12,51 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
 
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-
-        // 1. HEARTBEAT (The Green Status)
+        
+        // 1. HEARTBEAT
         if (lpparam.packageName.equals("com.hyperos.gesturefix")) {
             XposedHelpers.findAndHookMethod("com.hyperos.gesturefix.MainActivity", lpparam.classLoader, "isModuleActive", XC_MethodReplacement.returnConstant(true));
         }
 
-        // 2. THE BYPASS (Targeting all potential "Gatekeepers")
-        if (lpparam.packageName.equals("android") || 
-            lpparam.packageName.equals("com.android.settings") || 
-            lpparam.packageName.equals("com.xiaomi.misettings") || 
-            lpparam.packageName.equals("com.android.systemui")) {
-            
-            XposedBridge.log("HGS: Hooking Navigation Gatekeeper in " + lpparam.packageName);
+        // 2. THE SYSTEM LOCKDOWN (android framework)
+        if (lpparam.packageName.equals("android")) {
+            XposedBridge.log("HGS: Protecting Launcher from Reset...");
 
             try {
-                // This utility class is the primary check across HyperOS apps
+                // LOCKDOWN: Prevent the system from changing the default home app automatically
+                Class<?> ams = XposedHelpers.findClass("com.android.server.am.ActivityManagerService", lpparam.classLoader);
+                XposedHelpers.findAndHookMethod(ams, "updateDefaultHomeActivity", ComponentName.class, new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        ComponentName cn = (ComponentName) param.args[0];
+                        // If the system tries to force 'com.miui.home' back, we block it!
+                        if (cn != null && cn.getPackageName().equals("com.miui.home")) {
+                            XposedBridge.log("HGS: Blocked attempt to force MIUI Home reset.");
+                            param.setResult(null); // Stop the method from executing
+                        }
+                    }
+                });
+
+                // NAV BYPASS: Keep the gesture utilities happy
                 Class<?> navUtils = XposedHelpers.findClassIfExists("miui.util.MiuiNavUtils", lpparam.classLoader);
                 if (navUtils != null) {
-                    // Force system to report gestures are supported for ANY launcher
-                    XposedHelpers.findAndHookMethod(navUtils, "isSupportFullscreenGesture", 
-                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
-                    
-                    // Force system to think the current launcher is the official one
-                    XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", 
-                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                    XposedHelpers.findAndHookMethod(navUtils, "isSupportFullscreenGesture", android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                    XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", android.content.Context.class, XC_MethodReplacement.returnConstant(true));
                 }
             } catch (Throwable t) {
-                XposedBridge.log("HGS Error in " + lpparam.packageName + ": " + t.getMessage());
+                XposedBridge.log("HGS Framework Error: " + t.getMessage());
             }
         }
 
-        // 3. MIUI HOME BYPASS (Prevent the launcher from resetting itself)
-        if (lpparam.packageName.equals("com.miui.home")) {
+        // 3. SETTINGS & UI SPOOF
+        if (lpparam.packageName.equals("com.android.settings") || 
+            lpparam.packageName.equals("com.xiaomi.misettings") || 
+            lpparam.packageName.equals("com.android.systemui")) {
+            
             try {
-                Class<?> deviceConfig = XposedHelpers.findClassIfExists("com.miui.home.launcher.DeviceConfig", lpparam.classLoader);
-                if (deviceConfig != null) {
-                    XposedHelpers.findAndHookMethod(deviceConfig, "isThirdPartyLauncherSupported", 
-                        XC_MethodReplacement.returnConstant(true));
+                Class<?> navUtils = XposedHelpers.findClassIfExists("miui.util.MiuiNavUtils", lpparam.classLoader);
+                if (navUtils != null) {
+                    XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", android.content.Context.class, XC_MethodReplacement.returnConstant(true));
                 }
             } catch (Throwable ignored) {}
         }
