@@ -1,6 +1,7 @@
 package com.hyperos.gesturefix;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
@@ -11,8 +12,7 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
 
-        // 1. SELF-HOOK (The Green Test)
-        // This confirms the module can talk to its own UI
+        // 1. UI HEARTBEAT (The Green Test)
         if (lpparam.packageName.equals("com.hyperos.gesturefix")) {
             XposedHelpers.findAndHookMethod(
                     "com.hyperos.gesturefix.MainActivity",
@@ -22,22 +22,41 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
             );
         }
 
-        // 2. HYPEROS GESTURE UNLOCK
-        // We target both the framework and the launcher
-        if (lpparam.packageName.equals("android") || lpparam.packageName.equals("com.miui.home")) {
-            XposedBridge.log("HGS: Bypassing Gesture Block for " + lpparam.packageName);
+        // 2. THE SYSTEM BYPASS (The actual Fix)
+        if (lpparam.packageName.equals("android")) {
+            XposedBridge.log("HGS: Hooking Android Framework");
 
+            // Hook the MIUI Nav Utility to allow full screen gestures
             try {
-                // Core HyperOS Check: Is a 3rd party launcher allowed to use gestures?
-                // We force this to ALWAYS be true.
+                Class<?> navUtils = XposedHelpers.findClassIfExists("miui.util.MiuiNavUtils", lpparam.classLoader);
+                if (navUtils != null) {
+                    XposedHelpers.findAndHookMethod(navUtils, "isSupportFullscreenGesture", 
+                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                    XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", 
+                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                }
+            } catch (Throwable ignored) {}
+
+            // Hook the internal check that forces a switch back to MIUI Home
+            try {
+                Class<?> activityTaskManager = XposedHelpers.findClassIfExists("com.android.server.wm.ActivityTaskManagerService", lpparam.classLoader);
+                if (activityTaskManager != null) {
+                    // Prevent the system from detecting that the current launcher is 'unsupported'
+                    XposedHelpers.findAndHookMethod(activityTaskManager, "isCurrentHomeSupported", 
+                        XC_MethodReplacement.returnConstant(true));
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // 3. LAUNCHER-SIDE HOOK
+        if (lpparam.packageName.equals("com.miui.home")) {
+            try {
                 Class<?> deviceConfig = XposedHelpers.findClassIfExists("com.miui.home.launcher.DeviceConfig", lpparam.classLoader);
                 if (deviceConfig != null) {
-                    XposedHelpers.findAndHookMethod(deviceConfig, "isThirdPartyLauncherSupported", XC_MethodReplacement.returnConstant(true));
-                    XposedBridge.log("HGS: Successfully hooked DeviceConfig");
+                    XposedHelpers.findAndHookMethod(deviceConfig, "isThirdPartyLauncherSupported", 
+                        XC_MethodReplacement.returnConstant(true));
                 }
-            } catch (Throwable t) {
-                XposedBridge.log("HGS Error: " + t.getMessage());
-            }
+            } catch (Throwable ignored) {}
         }
     }
 }
