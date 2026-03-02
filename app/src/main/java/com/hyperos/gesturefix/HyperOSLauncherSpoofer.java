@@ -11,7 +11,8 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
 
-        // 1. UI CONNECTION TEST (Proves LSPosed is working)
+        // 1. SELF-HOOK (The Green Test)
+        // This confirms the module can talk to its own UI
         if (lpparam.packageName.equals("com.hyperos.gesturefix")) {
             XposedHelpers.findAndHookMethod(
                     "com.hyperos.gesturefix.MainActivity",
@@ -21,34 +22,21 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
             );
         }
 
-        // 2. SYSTEM FRAMEWORK HOOK (The actual HyperOS bypass)
-        if (lpparam.packageName.equals("android")) {
-            XposedBridge.log("HGS: Hooking Android System Framework");
-            try {
-                // HyperOS checks if the default launcher is a system launcher
-                // We force the system to always think it is.
-                Class<?> activityTaskManager = XposedHelpers.findClassIfExists("com.android.server.wm.ActivityTaskManagerService", lpparam.classLoader);
-                if (activityTaskManager != null) {
-                    XposedBridge.log("HGS: Found ActivityTaskManagerService");
-                    // Note: Method names can vary slightly by HyperOS version. 
-                    // This is a common override point for recents/gestures.
-                }
-            } catch (Throwable t) {
-                XposedBridge.log("HGS System Framework Error: " + t.getMessage());
-            }
-        }
+        // 2. HYPEROS GESTURE UNLOCK
+        // We target both the framework and the launcher
+        if (lpparam.packageName.equals("android") || lpparam.packageName.equals("com.miui.home")) {
+            XposedBridge.log("HGS: Bypassing Gesture Block for " + lpparam.packageName);
 
-        // 3. MIUI HOME HOOK
-        if (lpparam.packageName.equals("com.miui.home")) {
-            XposedBridge.log("HGS: Hooking MIUI Home");
             try {
-                // Many HyperOS versions use a utility class to verify system status
-                Class<?> utilitiesClass = XposedHelpers.findClassIfExists("com.miui.home.launcher.common.Utilities", lpparam.classLoader);
-                if (utilitiesClass != null) {
-                    XposedHelpers.findAndHookMethod(utilitiesClass, "isMiuiLauncher", XC_MethodReplacement.returnConstant(true));
+                // Core HyperOS Check: Is a 3rd party launcher allowed to use gestures?
+                // We force this to ALWAYS be true.
+                Class<?> deviceConfig = XposedHelpers.findClassIfExists("com.miui.home.launcher.DeviceConfig", lpparam.classLoader);
+                if (deviceConfig != null) {
+                    XposedHelpers.findAndHookMethod(deviceConfig, "isThirdPartyLauncherSupported", XC_MethodReplacement.returnConstant(true));
+                    XposedBridge.log("HGS: Successfully hooked DeviceConfig");
                 }
             } catch (Throwable t) {
-                XposedBridge.log("HGS MIUI Home Error: " + t.getMessage());
+                XposedBridge.log("HGS Error: " + t.getMessage());
             }
         }
     }

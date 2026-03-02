@@ -7,15 +7,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Internal check: No hooking required
-    private boolean isModuleActive() {
-        try {
-            // This class only exists if Xposed is active in this process
-            Class.forName("de.robv.android.xposed.XposedBridge", false, getClassLoader());
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
+    // This method is hooked by the Spoofer class above
+    public boolean isModuleActive() {
+        return false;
     }
 
     @Override
@@ -26,10 +20,10 @@ public class MainActivity extends AppCompatActivity {
         TextView tvStatus = findViewById(R.id.tvStatus);
 
         if (isModuleActive()) {
-            tvStatus.setText("Module Status: ACTIVE");
-            tvStatus.setTextColor(Color.parseColor("#00AA00")); // Green
+            tvStatus.setText("MODULE ACTIVE\nGestures Unlocked");
+            tvStatus.setTextColor(Color.parseColor("#4CAF50")); // Material Green
         } else {
-            tvStatus.setText("Module Status: INACTIVE");
+            tvStatus.setText("MODULE INACTIVE\nCheck LSPosed Scope");
             tvStatus.setTextColor(Color.RED);
         }
     }
