@@ -11,37 +11,41 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
 
-        // 1. UI HEARTBEAT
+        // 1. HEARTBEAT (The Green Status)
         if (lpparam.packageName.equals("com.hyperos.gesturefix")) {
             XposedHelpers.findAndHookMethod("com.hyperos.gesturefix.MainActivity", lpparam.classLoader, "isModuleActive", XC_MethodReplacement.returnConstant(true));
         }
 
-        // 2. SYSTEM & SETTINGS BYPASS
-        // We now target Settings and SystemUI to stop the "Auto-Reset"
+        // 2. THE BYPASS (Targeting all potential "Gatekeepers")
         if (lpparam.packageName.equals("android") || 
             lpparam.packageName.equals("com.android.settings") || 
+            lpparam.packageName.equals("com.xiaomi.misettings") || 
             lpparam.packageName.equals("com.android.systemui")) {
             
+            XposedBridge.log("HGS: Hooking Navigation Gatekeeper in " + lpparam.packageName);
+
             try {
+                // This utility class is the primary check across HyperOS apps
                 Class<?> navUtils = XposedHelpers.findClassIfExists("miui.util.MiuiNavUtils", lpparam.classLoader);
                 if (navUtils != null) {
-                    // Lie to the Settings app: "Yes, the current launcher is the system one."
-                    XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", 
-                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
-                    
-                    // Lie to the SystemUI: "Yes, gestures are supported here."
+                    // Force system to report gestures are supported for ANY launcher
                     XposedHelpers.findAndHookMethod(navUtils, "isSupportFullscreenGesture", 
                         android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                    
+                    // Force system to think the current launcher is the official one
+                    XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", 
+                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                XposedBridge.log("HGS Error in " + lpparam.packageName + ": " + t.getMessage());
+            }
         }
 
-        // 3. LAUNCHER-SIDE HOOK (HyperOS Launcher)
+        // 3. MIUI HOME BYPASS (Prevent the launcher from resetting itself)
         if (lpparam.packageName.equals("com.miui.home")) {
             try {
                 Class<?> deviceConfig = XposedHelpers.findClassIfExists("com.miui.home.launcher.DeviceConfig", lpparam.classLoader);
                 if (deviceConfig != null) {
-                    // Tell the launcher itself not to complain
                     XposedHelpers.findAndHookMethod(deviceConfig, "isThirdPartyLauncherSupported", 
                         XC_MethodReplacement.returnConstant(true));
                 }
