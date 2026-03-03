@@ -39,8 +39,8 @@ android {
 }
 
 dependencies {
-    // Modern Xposed API (Matching manifest minversion 93)
-    compileOnly 'org.lsposed.lsposed:api:93'
+    // Try version 1.0 if 93 continues to fail
+    compileOnly 'org.lsposed.lsposed:api:1.0'
 
     // Essential UI & File Sharing Components
     implementation 'androidx.appcompat:appcompat:1.6.1'
