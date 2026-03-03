@@ -22,6 +22,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvStatus, tvAudit;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private String lastAuditReport = ""; 
+    private Process logcatProcess;
+private boolean isMonitoring = false;
 
     public boolean isModuleActive() { 
         return false; 
@@ -36,7 +38,9 @@ public class MainActivity extends AppCompatActivity {
         tvAudit = findViewById(R.id.tvLogs); 
         Button btnFix = findViewById(R.id.btnFix);
         Button btnExport = findViewById(R.id.btnExport);
-
+        Button btnClear = findViewById(R.id.btnClear);
+        
+        startLogcatMonitor();
         updateLSPosedStatus();
 
         if (btnFix != null) {
@@ -49,12 +53,74 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+if (btnClear != null) {
+    btnClear.setOnClickListener(v -> {
+        if (tvAudit != null) {
+            tvAudit.setText("--- Logs Cleared ---\n");
+            // Reset scroll position to top
+            tvAudit.scrollTo(0, 0);
+        }
+        // Also clear the audit string so Export doesn't send old data
+        lastAuditReport = "";
+        
+        // Optional: Re-run a fresh audit immediately after clearing
+        runSystemAudit();
+        
+        Toast.makeText(this, "Logs refreshed", Toast.LENGTH_SHORT).show();
+    });
+}
+
         if (btnExport != null) {
             btnExport.setOnClickListener(v -> exportAuditLog());
         }
         
         runSystemAudit();
     }
+
+    private void startLogcatMonitor() {
+    if (isMonitoring) return;
+    isMonitoring = true;
+
+    new Thread(() -> {
+        try {
+            // We use 'su -c' so we can see system-level errors like 'Permission Denied'
+            // We filter for your tag and general system errors
+            logcatProcess = Runtime.getRuntime().exec(new String[]{"su", "-c", "logcat HGS_LOG:D *:E"});
+            BufferedReader reader = new BufferedReader(new InputStreamReader(logcatProcess.getInputStream()));
+            String line;
+
+            while (isMonitoring && (line = reader.readLine()) != null) {
+        final String logLine = line;
+        handler.post(() -> {
+            if (tvAudit != null) {
+                // If the user just cleared it, this will start fresh at the bottom
+                tvAudit.append(logLine + "\n");
+                
+                // Keep the last 1000 lines for a better history buffer
+                if (tvAudit.getLineCount() > 1000) {
+                    String currentText = tvAudit.getText().toString();
+                    int firstNewline = currentText.indexOf('\n', currentText.length() / 2);
+                    if (firstNewline != -1) {
+                        tvAudit.setText("... truncated ...\n" + currentText.substring(firstNewline + 1));
+                    }
+                }
+            }
+        });
+    }
+}catch (Exception e) {
+            handler.post(() -> tvAudit.append("Logcat Error: " + e.getMessage() + "\n"));
+        }
+    }).start();
+}
+
+@Override
+protected void onDestroy() {
+    super.onDestroy();
+    isMonitoring = false;
+    if (logcatProcess != null) {
+        logcatProcess.destroy();
+    }
+}
 
     private void updateLSPosedStatus() {
         if (tvStatus != null) {

@@ -16,17 +16,26 @@
 
     <Button
         android:id="@+id/btnFix"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="Run Brute Force Fix" />
-        <Button
-    android:id="@+id/btnExport"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Export Audit Log"
-    android:layout_marginTop="8dp"/>
+        android:layout_weight="1"
+        android:text="Fix"
+        android:layout_marginEnd="4dp" />
 
+    <Button
+        android:id="@+id/btnClear"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Clear"
+        android:layout_marginEnd="4dp" />
+
+    <Button
+        android:id="@+id/btnExport"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Export" />
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

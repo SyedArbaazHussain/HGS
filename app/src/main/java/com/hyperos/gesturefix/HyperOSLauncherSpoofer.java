@@ -1,6 +1,7 @@
 package com.hyperos.gesturefix;
 
 import android.content.ComponentName;
+import android.content.Context;
 import android.util.Log;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -59,6 +60,15 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
                     });
                 }
             } catch (Throwable t) { Log.e(TAG, "AMS Hook Failed: " + t.getMessage()); }
+            
+            // NEW: Framework-level Xiaomi Gesture Support Bypass
+            try {
+                Class<?> miuiSettings = XposedHelpers.findClassIfExists("android.provider.MiuiSettings$System", lpparam.classLoader);
+                if (miuiSettings != null) {
+                    XposedHelpers.findAndHookMethod(miuiSettings, "isSupportFullscreenGesture", 
+                        Context.class, XC_MethodReplacement.returnConstant(true));
+                }
+            } catch (Throwable t) { Log.e(TAG, "Framework Gesture Hook Failed: " + t.getMessage()); }
         }
 
         // 3. SETTINGS BYPASS (Xiaomi Settings app logic)
@@ -66,13 +76,11 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
             try {
                 Class<?> navUtils = XposedHelpers.findClassIfExists("miui.util.MiuiNavUtils", lpparam.classLoader);
                 if (navUtils != null) {
-                    // Spoof: Launcher is always "Default" so settings allows Gestures
                     XposedHelpers.findAndHookMethod(navUtils, "isDefaultSysLauncher", 
-                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                        Context.class, XC_MethodReplacement.returnConstant(true));
                     
-                    // Spoof: Always support gestures
                     XposedHelpers.findAndHookMethod(navUtils, "isSupportFullscreenGesture", 
-                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                        Context.class, XC_MethodReplacement.returnConstant(true));
                 }
             } catch (Throwable ignored) {}
         }
@@ -80,11 +88,25 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
         // 4. SYSTEM UI HOOKS (Touch engine and Nav Bar)
         if (lpparam.packageName.equals("com.android.systemui")) {
             try {
-                // Hook MIUI Specific Gesture Utils
+                // Hook MIUI Specific Gesture Utils (Core Xiaomi Logic)
                 Class<?> miuiUtils = XposedHelpers.findClassIfExists("com.android.systemui.MiuiGestureUtils", lpparam.classLoader);
                 if (miuiUtils != null) {
                     XposedHelpers.findAndHookMethod(miuiUtils, "isFsgMode", 
-                        android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+                        Context.class, XC_MethodReplacement.returnConstant(true));
+                }
+
+                // NEW: Hook Xiaomi internal NavigationUtils for SystemUI
+                Class<?> miuiNavUtils = XposedHelpers.findClassIfExists("com.android.systemui.NavigationUtils", lpparam.classLoader);
+                if (miuiNavUtils != null) {
+                    XposedHelpers.findAndHookMethod(miuiNavUtils, "isFsgMode", 
+                        Context.class, XC_MethodReplacement.returnConstant(true));
+                }
+
+                // NEW: Hook GestureStubView (This handles the back gesture touch area)
+                Class<?> gestureStub = XposedHelpers.findClassIfExists("com.android.systemui.statusbar.phone.GestureStubView", lpparam.classLoader);
+                if (gestureStub != null) {
+                    XposedHelpers.findAndHookMethod(gestureStub, "isGestureEnable", 
+                        Context.class, XC_MethodReplacement.returnConstant(true));
                 }
                 
                 // Force Navigation Mode to GESTURAL (2)
@@ -92,7 +114,6 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
                 if (navModeController != null) {
                     XposedHelpers.findAndHookMethod(navModeController, "getNavigationMode", 
                         XC_MethodReplacement.returnConstant(2)); 
-                    Log.d(TAG, "SystemUI NavigationMode forced to GESTURAL.");
                 }
                 
                 // Hook modern AOSP Navigation Bar Controller for HyperOS
