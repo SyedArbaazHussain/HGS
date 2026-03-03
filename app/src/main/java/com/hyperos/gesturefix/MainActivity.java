@@ -2,50 +2,84 @@ package com.hyperos.gesturefix;
 
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 
 public class MainActivity extends AppCompatActivity {
 
-    private TextView logView;
-
-    public boolean isModuleActive() { return false; }
+    private TextView tvStatus, tvLogs;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    
+    public boolean isModuleActive() { return false; } // Hooked by Xposed
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TextView status = findViewById(R.id.tvStatus);
-        logView = new TextView(this); // Quick debug view
-        
+        tvStatus = findViewById(R.id.tvStatus);
+        tvLogs = findViewById(R.id.tvLogs);
+        Button btnFix = findViewById(R.id.btnFix);
+
         if (isModuleActive()) {
-            status.setText("STATUS: INJECTED");
-            status.setTextColor(Color.GREEN);
+            tvStatus.setText("LSPosed: ACTIVE");
+            tvStatus.setTextColor(Color.GREEN);
         } else {
-            status.setText("STATUS: NOT HOOKED");
-            status.setTextColor(Color.RED);
+            tvStatus.setText("LSPosed: INACTIVE");
+            tvStatus.setTextColor(Color.RED);
         }
 
-        // Start a thread to read logs
-        new Thread(this::updateLogs).start();
+        btnFix.setOnClickListener(v -> runRootElevatedFix());
+        startLogStream();
     }
 
-    private void updateLogs() {
-        try {
-            Process process = Runtime.getRuntime().exec("logcat -d HGS_DEBUG:V *:S");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            StringBuilder builder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line).append("\n");
+    private void runRootElevatedFix() {
+        new Thread(() -> {
+            try {
+                Process p = Runtime.getRuntime().exec("su");
+                DataOutputStream os = new DataOutputStream(p.getOutputStream());
+
+                // Force the Gesture Flag and the Hide Gesture Line Flag
+                os.writeBytes("settings put global force_fsg_nav_bar 1\n");
+                os.writeBytes("settings put global hide_gesture_line 1\n");
+                
+                // Enable the Android Gestural Overlay
+                os.writeBytes("cmd overlay enable com.android.internal.systemui.navbar.gestural\n");
+
+                // Kill SystemUI to force it to reload the new database values
+                os.writeBytes("pkill -f com.android.systemui\n");
+                
+                os.writeBytes("exit\n");
+                os.flush();
+                os.waitFor();
+                runOnUiThread(() -> tvLogs.append("\n[ROOT] Applied changes and restarted SystemUI."));
+            } catch (Exception e) {
+                runOnUiThread(() -> tvLogs.append("\n[ROOT ERROR] " + e.getMessage()));
             }
-            runOnUiThread(() -> {
-                // You can add a ScrollView/TextView in XML or just Toast this
-                // For now, check your 'logcat' in Android Studio for "HGS_DEBUG"
-            });
-        } catch (Exception ignored) {}
+        }).start();
+    }
+
+    private void startLogStream() {
+        new Thread(() -> {
+            try {
+                // Fetch logs with our specific HGS_LOG tag
+                Process process = Runtime.getRuntime().exec("logcat -d HGS_LOG:V *:S");
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line).append("\n");
+                }
+                String logs = sb.toString();
+                handler.post(() -> tvLogs.setText(logs.isEmpty() ? "Waiting for system events..." : logs));
+            } catch (Exception ignored) {}
+            handler.postDelayed(this::startLogStream, 2500);
+        }).start();
     }
 }
