@@ -39,8 +39,8 @@ android {
 }
 
 dependencies {
-    // Try version 1.0 if 93 continues to fail
-    compileOnly 'org.lsposed.lsposed:api:1.0'
+    // FIX: Using the legacy coordinate which is most stable on api.xposed.info
+    compileOnly 'de.robv.android.xposed:api:82'
 
     // Essential UI & File Sharing Components
     implementation 'androidx.appcompat:appcompat:1.6.1'
