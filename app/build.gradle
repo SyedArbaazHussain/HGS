@@ -15,6 +15,17 @@ android {
         resConfigs "en"
     }
 
+    // Fix for Kotlin Duplicate Class errors (jdk7/jdk8 vs stdlib)
+    configurations.all {
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                if (details.requested.name.contains('kotlin-stdlib-jdk')) {
+                    details.useTarget("org.jetbrains.kotlin:kotlin-stdlib:${details.requested.version}")
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -39,7 +50,7 @@ android {
 }
 
 dependencies {
-    // Standard Xposed API - Switched to de.robv to fix resolution error
+    // Standard Xposed API - Stable coordinate for resolution
     compileOnly 'de.robv.android.xposed:api:82'
 
     // Essential UI & File Sharing Components
