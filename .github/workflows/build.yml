@@ -29,7 +29,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew clean assembleRelease --parallel --no-daemon
 
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
@@ -41,7 +41,6 @@ jobs:
           keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
         env:
-          # This tells the action to use a modern version of the build tools
           BUILD_TOOLS_VERSION: "34.0.0"
 
       - name: Create GitHub Release
@@ -58,5 +57,5 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
-          name: HGS-Signed-APK
+          name: HGS
           path: ${{ steps.sign_app.outputs.signedReleaseFile }}

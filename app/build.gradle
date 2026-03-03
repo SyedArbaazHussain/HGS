@@ -39,7 +39,7 @@ android {
 }
 
 dependencies {
-    // FIX: Using the legacy coordinate which is most stable on api.xposed.info
+    // Standard Xposed API - Switched to de.robv to fix resolution error
     compileOnly 'de.robv.android.xposed:api:82'
 
     // Essential UI & File Sharing Components
