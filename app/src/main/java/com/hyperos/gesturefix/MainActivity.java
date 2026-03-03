@@ -13,7 +13,6 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
@@ -24,10 +23,6 @@ public class MainActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private String lastAuditReport = ""; 
 
-    /**
-     * This method is hooked by LSPosed to return true.
-     * If it remains false, the injection has failed.
-     */
     public boolean isModuleActive() { 
         return false; 
     }
@@ -46,9 +41,11 @@ public class MainActivity extends AppCompatActivity {
 
         if (btnFix != null) {
             btnFix.setOnClickListener(v -> {
-                runRootElevatedFix();
-                // Delay re-audit to let SystemUI/Launcher finish restarting
-                handler.postDelayed(this::runSystemAudit, 4000);
+                new Thread(() -> {
+                    ShellUtils.applyRootFix();
+                    handler.post(() -> Toast.makeText(MainActivity.this, "Fix Applied. Rebooting UI...", Toast.LENGTH_SHORT).show());
+                    handler.postDelayed(this::runSystemAudit, 4500);
+                }).start();
             });
         }
 
@@ -56,7 +53,6 @@ public class MainActivity extends AppCompatActivity {
             btnExport.setOnClickListener(v -> exportAuditLog());
         }
         
-        // Run initial audit on launch
         runSystemAudit();
     }
 
@@ -69,36 +65,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void runSystemAudit() {
-        StringBuilder report = new StringBuilder();
-        report.append("<b>--- HYPEROS GESTURE AUDIT ---</b><br><br>");
+        new Thread(() -> {
+            StringBuilder report = new StringBuilder();
+            report.append("<b>--- HYPEROS GESTURE AUDIT ---</b><br><br>");
 
-        // 1. Check Overlay State
-        String overlayRaw = checkCommandOutput("cmd overlay list | grep gestural");
-        boolean isEnabled = overlayRaw.contains("[x]");
-        report.append(formatAuditLine("AOSP Overlay (Enabled)", isEnabled));
+            // Using 'su -c' for audit ensures we don't get 'null' on HyperOS
+            String overlayRaw = checkCommandOutput("cmd overlay list | grep gestural");
+            boolean isEnabled = overlayRaw.contains("[x]");
+            report.append(formatAuditLine("AOSP Overlay (Enabled)", isEnabled));
 
-        // 2. Check Database: navigation_mode (2 is gesture)
-        String navMode = checkCommandOutput("settings get secure navigation_mode").trim();
-        report.append(formatAuditLine("Nav Mode (Gesture=2): " + navMode, navMode.equals("2")));
+            String navMode = checkCommandOutput("settings get secure navigation_mode").trim();
+            report.append(formatAuditLine("Nav Mode (Gesture=2): " + navMode, navMode.equals("2")));
 
-        // 3. Check Database: force_fsg_nav_bar (1 is enabled)
-        String fsgFlag = checkCommandOutput("settings get global force_fsg_nav_bar").trim();
-        report.append(formatAuditLine("FSG Flag (ON=1): " + fsgFlag, fsgFlag.equals("1")));
+            String fsgFlag = checkCommandOutput("settings get global force_fsg_nav_bar").trim();
+            report.append(formatAuditLine("FSG Flag (ON=1): " + fsgFlag, fsgFlag.equals("1")));
 
-        // 4. Check MIUI specific status
-        String miuiFsg = checkCommandOutput("settings get secure miui_fsg_gesture_status").trim();
-        report.append(formatAuditLine("MIUI FSG Status: " + miuiFsg, miuiFsg.equals("1")));
+            String miuiFsg = checkCommandOutput("settings get secure miui_fsg_gesture_status").trim();
+            report.append(formatAuditLine("MIUI FSG Status: " + miuiFsg, miuiFsg.equals("1")));
 
-        // 5. Injection check
-        report.append(formatAuditLine("LSPosed Injection Status", isModuleActive()));
+            report.append(formatAuditLine("LSPosed Injection Status", isModuleActive()));
 
-        lastAuditReport = report.toString();
-        if (tvAudit != null) {
-            tvAudit.setText(Html.fromHtml(lastAuditReport, Html.FROM_HTML_MODE_COMPACT));
-        }
-        
-        // Always refresh the top header status too
-        updateLSPosedStatus();
+            lastAuditReport = report.toString();
+            handler.post(() -> {
+                if (tvAudit != null) {
+                    tvAudit.setText(Html.fromHtml(lastAuditReport, Html.FROM_HTML_MODE_COMPACT));
+                }
+                updateLSPosedStatus();
+            });
+        }).start();
     }
 
     private String formatAuditLine(String title, boolean passed) {
@@ -109,7 +103,8 @@ public class MainActivity extends AppCompatActivity {
 
     private String checkCommandOutput(String cmd) {
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"sh", "-c", cmd});
+            // Audit must run as root to read secure settings
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = reader.readLine();
             return (line != null) ? line : "null";
@@ -118,46 +113,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void runRootElevatedFix() {
-        new Thread(() -> {
-            try {
-                Process p = Runtime.getRuntime().exec("su");
-                DataOutputStream os = new DataOutputStream(p.getOutputStream());
-
-                // Set database flags
-                os.writeBytes("settings put secure navigation_mode 2\n");
-                os.writeBytes("settings put global force_fsg_nav_bar 1\n");
-                os.writeBytes("settings put secure sw_fs_gesture_fixed_mode 1\n");
-                os.writeBytes("settings put secure sw_fs_gesture_navigation_mode 1\n");
-                os.writeBytes("settings put secure miui_fsg_gesture_status 1\n");
-
-                // Disable/Enable overlay to trigger system refresh
-                os.writeBytes("cmd overlay disable com.android.internal.systemui.navbar.gestural\n");
-                os.writeBytes("cmd overlay enable com.android.internal.systemui.navbar.gestural\n");
-                os.writeBytes("cmd overlay disable com.android.internal.systemui.navbar.threebutton\n");
-
-                // Restart SystemUI and Launcher
-                os.writeBytes("pkill -f com.android.systemui\n");
-                os.writeBytes("pkill -f com.miui.home\n"); 
-                
-                os.writeBytes("exit\n");
-                os.flush();
-                p.waitFor();
-
-                handler.post(() -> Toast.makeText(MainActivity.this, "Fix Applied. Rebooting UI...", Toast.LENGTH_SHORT).show());
-            } catch (Exception e) {
-                handler.post(() -> Toast.makeText(MainActivity.this, "Root Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
-            }
-        }).start();
-    }
-
     private void exportAuditLog() {
         if (lastAuditReport.isEmpty()) {
             Toast.makeText(this, "Run Audit first", Toast.LENGTH_SHORT).show();
             return;
         }
         
-        // Strip HTML for plain text export
         String plainText = lastAuditReport.replaceAll("<[^>]*>", "")
                                          .replace("[PASS]", "PASS:")
                                          .replace("[FAIL]", "FAIL:");
