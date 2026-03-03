@@ -45,38 +45,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void runRootElevatedFix() {
-        new Thread(() -> {
-            try {
-                // Start the root process
-                Process p = Runtime.getRuntime().exec("su");
-                DataOutputStream os = new DataOutputStream(p.getOutputStream());
+    new Thread(() -> {
+        try {
+            Process p = Runtime.getRuntime().exec("su");
+            DataOutputStream os = new DataOutputStream(p.getOutputStream());
 
-                // Write the commands to the root shell
-                os.writeBytes("settings put global force_fsg_nav_bar 1\n");
-                os.writeBytes("settings put global hide_gesture_line 1\n");
-                os.writeBytes("cmd overlay enable com.android.internal.systemui.navbar.gestural\n");
-                os.writeBytes("pkill -f com.android.systemui\n");
-                
-                os.writeBytes("exit\n");
-                os.flush();
+            // 1. Force the Android Navigation Mode to '2' (Gestures)
+            os.writeBytes("settings put secure navigation_mode 2\n");
+            
+            // 2. Force the Xiaomi-specific gesture flag
+            os.writeBytes("settings put global force_fsg_nav_bar 1\n");
+            
+            // 3. Enable the underlying Android gestural overlay
+            os.writeBytes("cmd overlay enable com.android.internal.systemui.navbar.gestural\n");
 
-                // FIX: Call waitFor() on the Process 'p', not the DataOutputStream 'os'
-                int result = p.waitFor(); 
-                
-                runOnUiThread(() -> {
-                    if (tvLogs != null) {
-                        tvLogs.append("\n[ROOT] Applied changes (Exit Code: " + result + "). Restarting SystemUI...");
-                    }
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    if (tvLogs != null) {
-                        tvLogs.append("\n[ROOT ERROR] " + e.getMessage());
-                    }
-                });
-            }
-        }).start();
-    }
+            // 4. CRITICAL: Tell the system navigation is handled by the framework, not the launcher
+            os.writeBytes("settings put secure sw_fs_gesture_fixed_mode 1\n");
+
+            // 5. Restart SystemUI
+            os.writeBytes("pkill -f com.android.systemui\n");
+            
+            os.writeBytes("exit\n");
+            os.flush();
+            p.waitFor();
+            
+            runOnUiThread(() -> tvLogs.append("\n[ROOT] Navigation mode forced. Testing persistence..."));
+        } catch (Exception e) {
+            runOnUiThread(() -> tvLogs.append("\n[ROOT ERROR] " + e.getMessage()));
+        }
+    }).start();
+}
 
     private void startLogStream() {
         new Thread(() -> {
