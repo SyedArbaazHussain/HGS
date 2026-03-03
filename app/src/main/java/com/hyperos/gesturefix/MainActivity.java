@@ -21,12 +21,12 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView tvStatus, tvAudit;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private String lastAuditReport = ""; 
+    private String lastAuditReport = "";
     private Process logcatProcess;
-private boolean isMonitoring = false;
+    private boolean isMonitoring = false;
 
-    public boolean isModuleActive() { 
-        return false; 
+    public boolean isModuleActive() {
+        return false;
     }
 
     @Override
@@ -34,93 +34,95 @@ private boolean isMonitoring = false;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // UI Initialization
         tvStatus = findViewById(R.id.tvStatus);
-        tvAudit = findViewById(R.id.tvLogs); 
+        tvAudit = findViewById(R.id.tvLogs);
         Button btnFix = findViewById(R.id.btnFix);
-        Button btnExport = findViewById(R.id.btnExport);
         Button btnClear = findViewById(R.id.btnClear);
-        
+        Button btnExport = findViewById(R.id.btnExport);
+
+        // Start Monitors
         startLogcatMonitor();
         updateLSPosedStatus();
 
+        // 1. Fix Button Logic
         if (btnFix != null) {
             btnFix.setOnClickListener(v -> {
                 new Thread(() -> {
                     ShellUtils.applyRootFix();
                     handler.post(() -> Toast.makeText(MainActivity.this, "Fix Applied. Rebooting UI...", Toast.LENGTH_SHORT).show());
+                    // Re-run audit after a delay to show updated system state
                     handler.postDelayed(this::runSystemAudit, 4500);
                 }).start();
             });
         }
 
-if (btnClear != null) {
-    btnClear.setOnClickListener(v -> {
-        if (tvAudit != null) {
-            tvAudit.setText("--- Logs Cleared ---\n");
-            // Reset scroll position to top
-            tvAudit.scrollTo(0, 0);
+        // 2. Clear Button Logic
+        if (btnClear != null) {
+            btnClear.setOnClickListener(v -> {
+                if (tvAudit != null) {
+                    tvAudit.setText("--- Logs Cleared ---\n");
+                    tvAudit.scrollTo(0, 0);
+                }
+                lastAuditReport = "";
+                runSystemAudit();
+                Toast.makeText(this, "Logs refreshed", Toast.LENGTH_SHORT).show();
+            });
         }
-        // Also clear the audit string so Export doesn't send old data
-        lastAuditReport = "";
-        
-        // Optional: Re-run a fresh audit immediately after clearing
-        runSystemAudit();
-        
-        Toast.makeText(this, "Logs refreshed", Toast.LENGTH_SHORT).show();
-    });
-}
 
+        // 3. Export Button Logic
         if (btnExport != null) {
             btnExport.setOnClickListener(v -> exportAuditLog());
         }
-        
+
+        // Initial System Audit
         runSystemAudit();
     }
 
     private void startLogcatMonitor() {
-    if (isMonitoring) return;
-    isMonitoring = true;
+        if (isMonitoring) return;
+        isMonitoring = true;
 
-    new Thread(() -> {
-        try {
-            // We use 'su -c' so we can see system-level errors like 'Permission Denied'
-            // We filter for your tag and general system errors
-            logcatProcess = Runtime.getRuntime().exec(new String[]{"su", "-c", "logcat HGS_LOG:D *:E"});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(logcatProcess.getInputStream()));
-            String line;
+        new Thread(() -> {
+            try {
+                // Monitor for HGS_LOG (Xposed) and general Errors (Permission issues)
+                logcatProcess = Runtime.getRuntime().exec(new String[]{"su", "-c", "logcat HGS_LOG:D *:E"});
+                BufferedReader reader = new BufferedReader(new InputStreamReader(logcatProcess.getInputStream()));
+                String line;
 
-            while (isMonitoring && (line = reader.readLine()) != null) {
-        final String logLine = line;
-        handler.post(() -> {
-            if (tvAudit != null) {
-                // If the user just cleared it, this will start fresh at the bottom
-                tvAudit.append(logLine + "\n");
-                
-                // Keep the last 1000 lines for a better history buffer
-                if (tvAudit.getLineCount() > 1000) {
-                    String currentText = tvAudit.getText().toString();
-                    int firstNewline = currentText.indexOf('\n', currentText.length() / 2);
-                    if (firstNewline != -1) {
-                        tvAudit.setText("... truncated ...\n" + currentText.substring(firstNewline + 1));
-                    }
+                while (isMonitoring && (line = reader.readLine()) != null) {
+                    final String logLine = line;
+                    handler.post(() -> {
+                        if (tvAudit != null) {
+                            tvAudit.append(logLine + "\n");
+                            
+                            // Prevent memory lag by truncating after 1000 lines
+                            if (tvAudit.getLineCount() > 1000) {
+                                String currentText = tvAudit.getText().toString();
+                                int midPoint = currentText.indexOf('\n', currentText.length() / 2);
+                                if (midPoint != -1) {
+                                    tvAudit.setText("... [Log Truncated for Performance] ...\n" + currentText.substring(midPoint + 1));
+                                }
+                            }
+                        }
+                    });
                 }
+            } catch (Exception e) {
+                handler.post(() -> {
+                    if (tvAudit != null) tvAudit.append("Logcat Error: " + e.getMessage() + "\n");
+                });
             }
-        });
+        }).start();
     }
-}catch (Exception e) {
-            handler.post(() -> tvAudit.append("Logcat Error: " + e.getMessage() + "\n"));
-        }
-    }).start();
-}
 
-@Override
-protected void onDestroy() {
-    super.onDestroy();
-    isMonitoring = false;
-    if (logcatProcess != null) {
-        logcatProcess.destroy();
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        isMonitoring = false;
+        if (logcatProcess != null) {
+            logcatProcess.destroy();
+        }
     }
-}
 
     private void updateLSPosedStatus() {
         if (tvStatus != null) {
@@ -135,7 +137,6 @@ protected void onDestroy() {
             StringBuilder report = new StringBuilder();
             report.append("<b>--- HYPEROS GESTURE AUDIT ---</b><br><br>");
 
-            // Using 'su -c' for audit ensures we don't get 'null' on HyperOS
             String overlayRaw = checkCommandOutput("cmd overlay list | grep gestural");
             boolean isEnabled = overlayRaw.contains("[x]");
             report.append(formatAuditLine("AOSP Overlay (Enabled)", isEnabled));
@@ -169,13 +170,12 @@ protected void onDestroy() {
 
     private String checkCommandOutput(String cmd) {
         try {
-            // Audit must run as root to read secure settings
             Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = reader.readLine();
             return (line != null) ? line : "null";
-        } catch (Exception e) { 
-            return "error"; 
+        } catch (Exception e) {
+            return "error";
         }
     }
 
@@ -184,21 +184,21 @@ protected void onDestroy() {
             Toast.makeText(this, "Run Audit first", Toast.LENGTH_SHORT).show();
             return;
         }
-        
+
         String plainText = lastAuditReport.replaceAll("<[^>]*>", "")
                                          .replace("[PASS]", "PASS:")
                                          .replace("[FAIL]", "FAIL:");
         try {
             File cachePath = new File(getCacheDir(), "logs");
             if (!cachePath.exists()) cachePath.mkdirs();
-            
+
             File logFile = new File(cachePath, "gesture_audit.txt");
             FileOutputStream stream = new FileOutputStream(logFile);
             stream.write(plainText.getBytes());
             stream.close();
 
             Uri contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", logFile);
-            
+
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("text/plain");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
