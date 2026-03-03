@@ -75,5 +75,24 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
                 }
             } catch (Throwable ignored) {}
         }
+
+        // Inside handleLoadPackage, add a specific check for SystemUI
+if (lpparam.packageName.equals("com.android.systemui")) {
+    try {
+        // Force SystemUI to believe that the AOSP gesture engine is the primary one
+        Class<?> fsgUtils = XposedHelpers.findClassIfExists("com.android.systemui.MiuiGestureUtils", lpparam.classLoader);
+        if (fsgUtils != null) {
+            XposedHelpers.findAndHookMethod(fsgUtils, "isFsgMode", 
+                android.content.Context.class, XC_MethodReplacement.returnConstant(true));
+        }
+        
+        // This is the most important part: tell SystemUI gestures are ALWAYS supported
+        Class<?> navModeController = XposedHelpers.findClassIfExists("com.android.systemui.navigationbar.NavigationModeController", lpparam.classLoader);
+        if (navModeController != null) {
+            XposedHelpers.findAndHookMethod(navModeController, "getNavigationMode", 
+                XC_MethodReplacement.returnConstant(2)); // 2 = GESTURAL
+        }
+    } catch (Throwable t) { Log.e(TAG, "SystemUI Gesture Hook Failed: " + t.getMessage()); }
+}
     }
 }
