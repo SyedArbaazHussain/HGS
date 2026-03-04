@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 10 
     permissions:
       contents: write
@@ -34,10 +34,6 @@ jobs:
 
       - name: Fix Gradlew Permissions
         run: chmod +x gradlew
-
-      - name: Inject Android SDK Path
-        # This creates the file Gradle is begging for in your error logs
-        run: echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace --no-daemon
