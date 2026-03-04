@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.GestureFix" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">@color/purple_500</item>
+    <style name="Theme.Hgs" parent="Theme.Material3.Dark.NoActionBar">
+        
+        <item name="colorPrimary">#2196F3</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         
-        <item name="android:windowBackground">?attr/colorSurface</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">#0F0F0F</item>
+        <item name="android:navigationBarColor">#0F0F0F</item>
         
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">#0F0F0F</item>
         
-        <item name="colorPrimaryContainer">#EADDFF</item>
-        <item name="colorOnPrimaryContainer">#21005D</item>
-        <item name="colorSurface">#FFFBFE</item>
-        <item name="colorOnSurface">#1C1B1F</item>
+        <item name="colorSurface">#1E1E1E</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOutline">#2A2A2A</item>
+
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

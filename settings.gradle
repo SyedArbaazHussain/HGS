@@ -1,6 +1,12 @@
 pluginManagement {
     repositories {
-        google()
+        google {
+            content {
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
+                includeGroupAndSubgroups("androidx")
+            }
+        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -11,13 +17,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Essential for LSPosed/Xposed API resolution
-        maven { url 'https://api.xposed.info/' }
-        // Fallback for modern third-party dependencies
-        maven { url 'https://jitpack.io' }
     }
 }
 
-// Updated name to match the project identifier used in build.gradle
-rootProject.name = "HyperOSGestureFix"
+rootProject.name = "hgs"
 include ':app'

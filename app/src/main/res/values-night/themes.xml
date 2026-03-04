@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.GestureFix" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:colorBackground">@android:color/black</item>
+    <style name="Theme.Hgs" parent="Theme.Material3.Dark.NoActionBar">
         
-        <item name="android:navigationBarColor">@android:color/black</item>
-        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:windowBackground">#0F0F0F</item>
+        <item name="android:colorBackground">#0F0F0F</item>
         
-        <item name="colorSurface">#121212</item>
-        <item name="colorSurfaceVariant">#1E1E1E</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        
+        <item name="colorSurface">#1E1E1E</item>
+        <item name="colorSurfaceVariant">#2A2A2A</item>
         <item name="colorOnSurface">#FFFFFF</item>
         
-        <item name="colorPrimary">#D0BCFF</item>
-        <item name="colorOnPrimary">#381E72</item>
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

@@ -1,0 +1,30 @@
+# IDE / OS Files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+captures/
+
+# Android / Build Outputs
+**/build/
+*.apk
+*.aar
+*.jks
+local.properties
+
+# Gradle specific
+.gradle/
+build/
+
+# Do not commit the manual Gradle distribution zip
+gradle-9.3.1-bin.zip
+
+# Do not commit the local distribution folder if you created one
+gradle-dist/
+
+# Gradle Wrapper - Keep the properties/jar for CI, but ignore the binary output
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Log files
+*.log

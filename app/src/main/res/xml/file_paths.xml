@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="logs" path="." />
-    <external-path name="external_logs" path="Android/data/com.hyperos.gesturefix/cache" />
+    
+    <external-path name="external_logs" path="Android/data/com.sah.hgs/cache" />
 </paths>
