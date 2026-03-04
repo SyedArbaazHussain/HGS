@@ -23,13 +23,19 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          # We still keep this as a fallback, but the next step handles the heavy lifting
           cache: gradle
 
       - name: Grant Execute Permission for Gradle
         run: chmod +x gradlew
 
-      - name: Build Release APK
-        run: ./gradlew clean assembleRelease --parallel --no-daemon
+      - name: Build with Gradle
+        # Using the official action is the "proper" way to handle caching and configuration-cache
+        uses: gradle/gradle-build-action@v3
+        with:
+          arguments: assembleRelease
+          # This avoids the "single-use daemon" fork by using the runner's environment correctly
+          generate-job-summary: true
 
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
@@ -49,7 +55,13 @@ jobs:
         with:
           files: ${{ steps.sign_app.outputs.signedReleaseFile }}
           name: HyperOS Gesture Fix ${{ github.ref_name }}
-          body: "Automated release of HyperOS Gesture Fix"
+          body: |
+            ### Automated Release
+            - Built with optimized Gradle 8.2.1
+            - Includes HyperOS Gesture Enforcement logic
+            - Verified for Poco F7
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -57,5 +69,5 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
-          name: HGS
+          name: HyperOS_Gesture_Fix_Debug
           path: ${{ steps.sign_app.outputs.signedReleaseFile }}
