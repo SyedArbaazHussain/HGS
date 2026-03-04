@@ -1,10 +1,6 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupAndSubgroups("com.android", "com.google", "androidx", "io.github.libxposed")
-            }
-        }
+        google ()
         mavenCentral()
         gradlePluginPortal()
     }
