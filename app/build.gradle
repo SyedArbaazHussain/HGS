@@ -11,11 +11,11 @@ android {
         minSdk 28
         targetSdk 34
         versionCode 1
-        versionName "1.0-Release"
+        versionName "1.2-HyperEnforce"
         resConfigs "en"
     }
 
-    // Fix for Kotlin Duplicate Class errors (jdk7/jdk8 vs stdlib)
+    // Resolution strategy to prevent duplicate class conflicts between Kotlin and JDK wrappers
     configurations.all {
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             if (details.requested.group == 'org.jetbrains.kotlin') {
@@ -50,15 +50,15 @@ android {
 }
 
 dependencies {
-    // Standard Xposed API - Stable coordinate for resolution
+    // Xposed API (compileOnly ensures it isn't bundled into the APK)
     compileOnly 'de.robv.android.xposed:api:82'
 
-    // Essential UI & File Sharing Components
+    // UI & Material Design 3 Components (Required for rounded cards and elevation)
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.core:core:1.10.1'
-    implementation 'androidx.core:core-ktx:1.10.1'
-    
-    // UI Layouts
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Core Android KTX for FileProvider and Sharing
+    implementation 'androidx.core:core:1.10.1'
+    implementation 'androidx.core:core-ktx:1.10.1'
 }

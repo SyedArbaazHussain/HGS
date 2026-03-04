@@ -11,12 +11,13 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Essential for LSPosed API resolution
+        // Essential for LSPosed/Xposed API resolution
         maven { url 'https://api.xposed.info/' }
-        // Fallback for modern dependencies
+        // Fallback for modern third-party dependencies
         maven { url 'https://jitpack.io' }
     }
 }
 
-rootProject.name = "HyperOS_Gestures_Spoof"
+// Updated name to match the project identifier used in build.gradle
+rootProject.name = "HyperOSGestureFix"
 include ':app'

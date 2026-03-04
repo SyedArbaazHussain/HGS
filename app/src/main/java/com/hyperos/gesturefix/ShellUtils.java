@@ -24,10 +24,12 @@ public class ShellUtils {
             os.writeBytes("cmd overlay disable com.android.internal.systemui.navbar.threebutton\n");
 
             // 4. TOUCH INTERACTION & INTERACTION CACHE FIX
-            // These lines ensure the system doesn't block the touch layer for gestures
             os.writeBytes("settings put secure show_gesture_app_switch_hint 1\n");
             os.writeBytes("settings put secure full_screen_gesture_back_type 1\n");
             os.writeBytes("settings delete secure last_setup_shown\n");
+            
+            // Fix: Explicitly enable edge touch regions for back gestures
+            os.writeBytes("settings put secure edge_handwriting_enabled 1\n");
 
             // 5. AGGRESSIVE RESTART SEQUENCE
             os.writeBytes("pkill -f com.android.systemui\n");
@@ -35,19 +37,22 @@ public class ShellUtils {
             os.writeBytes("pkill -f com.xiaomi.misettings\n");
             os.writeBytes("pkill -f com.android.settings\n");
             
-            // Reset the hardware input processor to bind the new gesture touch areas
+            // Critical: Reset the hardware input processor to bind the new gesture touch areas
             os.writeBytes("pkill -f android.hardware.input.processor\n");
 
-            // Wait 1.5 seconds for SystemUI to respawn before resetting display metrics
+            // Wait 1.5 seconds for SystemUI to respawn
             os.writeBytes("sleep 1.5\n");
 
             // 6. HARDWARE COMPOSER (HWC) & LAYOUT RESET
             os.writeBytes("wm size reset\n");
             os.writeBytes("wm density reset\n");
 
-            // Disable conflicts and clear input spam
+            // 7. INPUT METHOD & OVERRIDE CLEANUP
             os.writeBytes("settings put secure icon_blacklist navbar\n");
             os.writeBytes("settings put secure show_ime_with_hard_keyboard 0\n");
+            
+            // Fix: Force re-evaluation of the navigation bar state
+            os.writeBytes("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS\n");
 
             os.writeBytes("exit\n");
             os.flush();

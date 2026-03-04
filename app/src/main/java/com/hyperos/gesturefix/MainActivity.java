@@ -26,9 +26,6 @@ public class MainActivity extends AppCompatActivity {
     private Process logcatProcess;
     private boolean isMonitoring = false;
 
-    /**
-     * Hooked by LSPosed. Returns true if injection is successful.
-     */
     public boolean isModuleActive() {
         return false;
     }
@@ -38,138 +35,70 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // UI Initialization
         tvStatus = findViewById(R.id.tvStatus);
         tvAudit = findViewById(R.id.tvAudit); 
         tvLogs = findViewById(R.id.tvLogs);   
-        scrollLog = (ScrollView) tvLogs.getParent();
+        scrollLog = findViewById(R.id.scrollLog);
 
-        // Main Fix Button
         Button btnFix = findViewById(R.id.btnFix);
-        
-        // Terminal/Log Buttons
+        Button btnStart = findViewById(R.id.btnStart);
         Button btnStop = findViewById(R.id.btnStop);
         Button btnClear = findViewById(R.id.btnClear);
         Button btnExport = findViewById(R.id.btnExport);
 
-        // Configuration: Make logs selectable and copyable
         if (tvLogs != null) {
             tvLogs.setTextIsSelectable(true);
         }
 
         updateLSPosedStatus();
-        startLogcatMonitor();
+        startAuditLoop(); // Persistent dashboard updates
 
-        // 1. APPLY FIX - High-visibility main action
         if (btnFix != null) {
             btnFix.setOnClickListener(v -> {
                 new Thread(() -> {
                     ShellUtils.applyRootFix();
-                    handler.post(() -> {
-                        Toast.makeText(this, "Enforcing Gestures...", Toast.LENGTH_SHORT).show();
-                        if (!isMonitoring) startLogcatMonitor(); 
-                    });
-                    handler.postDelayed(this::runSystemAudit, 4500);
+                    handler.post(() -> Toast.makeText(this, "Enforcing Gestures...", Toast.LENGTH_SHORT).show());
                 }).start();
             });
         }
 
-        // 2. STOP LOG - Terminal Control
+        if (btnStart != null) {
+            btnStart.setOnClickListener(v -> startLogcatMonitor());
+        }
+
         if (btnStop != null) {
             btnStop.setOnClickListener(v -> stopLogcatMonitor());
         }
 
-        // 3. CLEAR LOGS - Terminal Control
         if (btnClear != null) {
             btnClear.setOnClickListener(v -> {
-                if (tvLogs != null) {
-                    tvLogs.setText("--- Terminal Cleared ---\n");
-                }
-                Toast.makeText(this, "Terminal Cleared", Toast.LENGTH_SHORT).show();
+                if (tvLogs != null) tvLogs.setText("--- Terminal Cleared ---\n");
             });
         }
 
-        // 4. EXPORT LOGS - Diagnostic Control
         if (btnExport != null) {
             btnExport.setOnClickListener(v -> exportRealLogs());
         }
+    }
 
-        // Initial system check
+    private void startAuditLoop() {
         runSystemAudit();
-    }
-
-    private void runSystemAudit() {
-        new Thread(() -> {
-            StringBuilder report = new StringBuilder();
-            
-            // 1. Overlay Check
-            String overlayRaw = checkCommandOutput("cmd overlay list | grep gestural");
-            int overlayState = overlayRaw.contains("[x]") ? 1 : (overlayRaw.contains("[ ]") ? 0 : -1);
-            report.append(formatAuditLine("AOSP Gesture Overlay", overlayState));
-
-            // 2. Nav Mode
-            String navMode = checkCommandOutput("settings get secure navigation_mode").trim();
-            int navState = navMode.equals("2") ? 1 : (navMode.equals("null") ? -1 : 0);
-            report.append(formatAuditLine("System Navigation Mode", navState));
-
-            // 3. FSG Flag
-            String fsgFlag = checkCommandOutput("settings get global force_fsg_nav_bar").trim();
-            int fsgState = fsgFlag.equals("1") ? 1 : (fsgFlag.equals("null") ? -1 : 0);
-            report.append(formatAuditLine("Global FSG Flag", fsgState));
-
-            // 4. MIUI FSG
-            String miuiFsg = checkCommandOutput("settings get secure miui_fsg_gesture_status").trim();
-            int miuiState = miuiFsg.equals("1") ? 1 : (miuiFsg.equals("null") ? -1 : 0);
-            report.append(formatAuditLine("MIUI FSG Status", miuiState));
-
-            // 5. Injection Status
-            report.append(formatAuditLine("LSPosed Hook Injection", isModuleActive() ? 1 : 0));
-
-            handler.post(() -> {
-                if (tvAudit != null) {
-                    tvAudit.setText(Html.fromHtml(report.toString(), Html.FROM_HTML_MODE_COMPACT));
-                }
-                updateLSPosedStatus();
-            });
-        }).start();
-    }
-
-    /**
-     * Formats audit lines with specific colors:
-     * Green (1) = Success
-     * Red (0) = Fail
-     * Yellow (-1) = Unknown/Detached
-     */
-    private String formatAuditLine(String label, int state) {
-        String color;
-        String icon;
-        
-        switch (state) {
-            case 1: 
-                color = "#4CAF50"; // Green
-                icon = "✔ ";
-                break;
-            case 0: 
-                color = "#F44336"; // Red
-                icon = "✘ ";
-                break;
-            default: 
-                color = "#FFEB3B"; // Yellow
-                icon = "❓ ";
-                break;
-        }
-        
-        return "<font color=\"" + color + "\">" + icon + label + "</font><br/>";
+        // Refresh every 3 seconds to keep dashboard state constant
+        handler.postDelayed(this::startAuditLoop, 3000);
     }
 
     private void startLogcatMonitor() {
         if (isMonitoring) return;
         isMonitoring = true;
-        if (tvLogs != null) tvLogs.append("\n[Log Monitor Active]\n");
+        if (tvLogs != null) tvLogs.append("\n[Filtering logs for Gesture Engine...]\n");
 
         new Thread(() -> {
             try {
-                logcatProcess = Runtime.getRuntime().exec(new String[]{"su", "-c", "logcat HGS_LOG:D *:E"});
+                // AGGRESSIVE FILTER: Only allows Gesture, Input, Hardware Composer, and our Module logs.
+                // Everything else (*:S) is silenced to stop the noise.
+                String cmd = "logcat HGS_LOG:V NavigationBar:V EdgeBackGestureHandler:V MiuiEdgeBackGestureHandler:V GestureStubView:V InputDispatcher:E HwcComposer:E *:S";
+                logcatProcess = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+                
                 BufferedReader reader = new BufferedReader(new InputStreamReader(logcatProcess.getInputStream()));
                 String line;
 
@@ -178,11 +107,8 @@ public class MainActivity extends AppCompatActivity {
                     handler.post(() -> {
                         if (tvLogs != null) {
                             tvLogs.append(logLine + "\n");
+                            if (scrollLog != null) scrollLog.fullScroll(ScrollView.FOCUS_DOWN);
                             
-                            if (scrollLog != null) {
-                                scrollLog.fullScroll(ScrollView.FOCUS_DOWN);
-                            }
-
                             if (tvLogs.getLineCount() > 2000) {
                                 String current = tvLogs.getText().toString();
                                 tvLogs.setText("[Buffer Purged]\n" + current.substring(current.length() / 2));
@@ -204,8 +130,45 @@ public class MainActivity extends AppCompatActivity {
             logcatProcess.destroy();
             logcatProcess = null;
         }
-        if (tvLogs != null) tvLogs.append("\n[Log Monitor Suspended]\n");
-        Toast.makeText(this, "Monitor Suspended", Toast.LENGTH_SHORT).show();
+        if (tvLogs != null) tvLogs.append("[Monitor Stopped]\n");
+    }
+
+    private void runSystemAudit() {
+        new Thread(() -> {
+            StringBuilder report = new StringBuilder();
+            report.append("<b>GESTURE DASHBOARD</b><br/>");
+            
+            report.append(formatAuditLine("AOSP Overlay", checkCommandOutput("cmd overlay list | grep gestural").contains("[x]") ? 1 : 0));
+            
+            String navMode = checkCommandOutput("settings get secure navigation_mode").trim();
+            report.append(formatAuditLine("Nav Mode (2)", navMode.equals("2") ? 1 : (navMode.equals("null") ? -1 : 0)));
+
+            String fsgFlag = checkCommandOutput("settings get global force_fsg_nav_bar").trim();
+            report.append(formatAuditLine("FSG Global Flag", fsgFlag.equals("1") ? 1 : (fsgFlag.equals("null") ? -1 : 0)));
+
+            String miuiFsg = checkCommandOutput("settings get secure miui_fsg_gesture_status").trim();
+            report.append(formatAuditLine("MIUI FSG Status", miuiFsg.equals("1") ? 1 : (miuiFsg.equals("null") ? -1 : 0)));
+
+            report.append(formatAuditLine("LSPosed Hook", isModuleActive() ? 1 : 0));
+
+            handler.post(() -> {
+                if (tvAudit != null) {
+                    tvAudit.setText(Html.fromHtml(report.toString(), Html.FROM_HTML_MODE_COMPACT));
+                }
+                updateLSPosedStatus();
+            });
+        }).start();
+    }
+
+    private String formatAuditLine(String label, int state) {
+        String color;
+        String icon;
+        switch (state) {
+            case 1: color = "#4CAF50"; icon = "✔ "; break; // Green
+            case 0: color = "#F44336"; icon = "✘ "; break; // Red
+            default: color = "#FFEB3B"; icon = "❓ "; break; // Yellow
+        }
+        return "<font color=\"" + color + "\">" + icon + label + "</font><br/>";
     }
 
     private String checkCommandOutput(String cmd) {
@@ -213,32 +176,24 @@ public class MainActivity extends AppCompatActivity {
             Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = reader.readLine();
-            return (line != null) ? line.trim() : "null";
+            return (line != null) ? line : "null";
         } catch (Exception e) { return "err"; }
     }
 
     private void exportRealLogs() {
         if (tvLogs == null || tvLogs.getText().toString().isEmpty()) return;
-        
-        String logContent = tvLogs.getText().toString();
         try {
             File cachePath = new File(getCacheDir(), "logs");
             if (!cachePath.exists()) cachePath.mkdirs();
-
             File logFile = new File(cachePath, "hgs_diagnostic_report.txt");
             FileOutputStream stream = new FileOutputStream(logFile);
-            stream.write(logContent.getBytes());
+            stream.write(tvLogs.getText().toString().getBytes());
             stream.close();
-
             Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", logFile);
-            Intent intent = new Intent(Intent.ACTION_SEND);
-            intent.setType("text/plain");
-            intent.putExtra(Intent.EXTRA_STREAM, uri);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent intent = new Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(intent, "Share Diagnostic Report"));
-        } catch (Exception e) {
-            Toast.makeText(this, "Export Failed", Toast.LENGTH_SHORT).show();
-        }
+        } catch (Exception e) { Toast.makeText(this, "Export Failed", Toast.LENGTH_SHORT).show(); }
     }
 
     private void updateLSPosedStatus() {

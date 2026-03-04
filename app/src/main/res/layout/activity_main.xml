@@ -14,7 +14,7 @@
         android:textColor="#FFFFFF"
         android:textSize="22sp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="20dp"
         android:textStyle="bold" />
 
     <LinearLayout
@@ -55,8 +55,8 @@
             android:textColor="#FFFFFF"
             android:fontFamily="monospace"
             android:textSize="13sp"
-            android:lineSpacingExtra="4dp"
-            android:text="Initializing Audit..."/>
+            android:lineSpacingExtra="6dp"
+            android:text="Initializing Dashboard..." />
     </LinearLayout>
 
     <LinearLayout
@@ -69,7 +69,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Diagnostic Terminal"
+            android:text="Filtered Diagnostic Terminal"
             android:textColor="#666666"
             android:textSize="12sp"
             android:layout_marginBottom="8dp" />
@@ -78,8 +78,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:weightSum="3"
+            android:weightSum="4"
             android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnStart"
+                style="@style/Widget.AppCompat.Button.Borderless"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Start"
+                android:textColor="#4CAF50" />
 
             <Button
                 android:id="@+id/btnStop"
@@ -106,10 +115,11 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Export"
-                android:textColor="#4CAF50" />
+                android:textColor="#2196F3" />
         </LinearLayout>
 
         <ScrollView
+            android:id="@+id/scrollLog"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#1A1A1A"
@@ -122,8 +132,9 @@
                 android:padding="8dp"
                 android:textColor="#00FF00"
                 android:fontFamily="monospace"
-                android:textSize="11sp"
-                android:textIsSelectable="true" />
+                android:textSize="10sp"
+                android:textIsSelectable="true"
+                android:text="Terminal Ready..." />
         </ScrollView>
     </LinearLayout>
 </LinearLayout>

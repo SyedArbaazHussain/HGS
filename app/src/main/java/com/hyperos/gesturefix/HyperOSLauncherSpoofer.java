@@ -16,7 +16,7 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
     @Override
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
         
-        // 1. SELF-HOOK: Update app UI status to "ACTIVE"
+        // 1. SELF-HOOK: Verify module is active in App UI
         if (lpparam.packageName.equals("com.hyperos.gesturefix")) {
             XposedHelpers.findAndHookMethod("com.hyperos.gesturefix.MainActivity", lpparam.classLoader, 
                 "isModuleActive", XC_MethodReplacement.returnConstant(true));
@@ -24,7 +24,6 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
 
         // 2. SYSTEM FRAMEWORK HOOKS (android)
         if (lpparam.packageName.equals("android")) {
-            // Block attempt to disable Gestural Overlay
             try {
                 Class<?> oms = XposedHelpers.findClassIfExists("com.android.server.om.OverlayManagerService", lpparam.classLoader);
                 if (oms != null) {
@@ -40,10 +39,7 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
                         }
                     });
                 }
-            } catch (Throwable ignored) {}
 
-            // Prevent auto-revert to MIUI Launcher
-            try {
                 Class<?> ams = XposedHelpers.findClassIfExists("com.android.server.wm.ActivityTaskManagerService", lpparam.classLoader);
                 if (ams != null) {
                     XposedHelpers.findAndHookMethod(ams, "updateDefaultHomeActivity", ComponentName.class, new XC_MethodHook() {
@@ -56,10 +52,7 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
                         }
                     });
                 }
-            } catch (Throwable ignored) {}
 
-            // Support Fullscreen Gestures in Framework Settings
-            try {
                 Class<?> miuiSettings = XposedHelpers.findClassIfExists("android.provider.MiuiSettings$System", lpparam.classLoader);
                 if (miuiSettings != null) {
                     XposedHelpers.findAndHookMethod(miuiSettings, "isSupportFullscreenGesture", 
@@ -68,7 +61,7 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
             } catch (Throwable ignored) {}
         }
 
-        // 3. SETTINGS BYPASS (Xiaomi Settings app logic)
+        // 3. SETTINGS BYPASS
         if (lpparam.packageName.equals("com.xiaomi.misettings") || lpparam.packageName.equals("com.android.settings")) {
             try {
                 Class<?> navUtils = XposedHelpers.findClassIfExists("miui.util.MiuiNavUtils", lpparam.classLoader);
@@ -79,64 +72,60 @@ public class HyperOSLauncherSpoofer implements IXposedHookLoadPackage {
             } catch (Throwable ignored) {}
         }
 
-        // 4. SYSTEM UI HOOKS (Touch engine and Nav Bar)
+        // 4. SYSTEM UI HOOKS (The Gesture Engine)
         if (lpparam.packageName.equals("com.android.systemui")) {
             try {
-                // NAVIGATION MODE CONTROLLER: Intercept change requests and force getter
+                // FORCE NAV MODE: Prevent system from reverting to buttons
                 Class<?> navModeController = XposedHelpers.findClassIfExists("com.android.systemui.navigationbar.NavigationModeController", lpparam.classLoader);
                 if (navModeController != null) {
                     XposedHelpers.findAndHookMethod(navModeController, "onRequestedNavigationModeChange", 
                         int.class, new XC_MethodHook() {
                             @Override
                             protected void beforeHookedMethod(MethodHookParam param) {
-                                param.args[0] = 2; // Force requested mode to Gestures (2)
+                                param.args[0] = 2; 
                             }
                         });
-
                     XposedHelpers.findAndHookMethod(navModeController, "getNavigationMode", 
                         XC_MethodReplacement.returnConstant(2)); 
                 }
 
-                // TOUCH ENGINE: Force Back Gesture regions to stay active
+                // AOSP EDGE HANDLER
                 Class<?> edgeBackHandler = XposedHelpers.findClassIfExists("com.android.systemui.navigationbar.gestural.EdgeBackGestureHandler", lpparam.classLoader);
                 if (edgeBackHandler != null) {
                     XposedHelpers.findAndHookMethod(edgeBackHandler, "isHandlingGestures", 
                         XC_MethodReplacement.returnConstant(true));
                 }
 
-                // XIAOMI STUB: Bypass Xiaomi's "Touch Guard" which kills gestures on non-MIUI launchers
+                // NEW: XIAOMI SPECIFIC EDGE HANDLER (The physical back swipe fix)
+                Class<?> miuiEdgeBack = XposedHelpers.findClassIfExists("com.android.systemui.navigationbar.gestural.MiuiEdgeBackGestureHandler", lpparam.classLoader);
+                if (miuiEdgeBack != null) {
+                    XposedHelpers.findAndHookMethod(miuiEdgeBack, "isHandlingGestures", 
+                        XC_MethodReplacement.returnConstant(true));
+                }
+
+                // GESTURE STUBS: Force physical touch areas to stay active
                 Class<?> miuiGestureStub = XposedHelpers.findClassIfExists("com.android.systemui.statusbar.phone.MiuiGestureStubView", lpparam.classLoader);
                 if (miuiGestureStub != null) {
                     XposedHelpers.findAndHookMethod(miuiGestureStub, "isGestureEnable", 
                         Context.class, XC_MethodReplacement.returnConstant(true));
-                    
-                    // Force the touch area height to be valid (not 0)
                     XposedHelpers.findAndHookMethod(miuiGestureStub, "getGestureHeight", 
                         XC_MethodReplacement.returnConstant(200)); 
                 }
 
-                // CORE UTILS: MIUI Specific Gesture Utils
-                Class<?> miuiUtils = XposedHelpers.findClassIfExists("com.android.systemui.MiuiGestureUtils", lpparam.classLoader);
-                if (miuiUtils != null) {
-                    XposedHelpers.findAndHookMethod(miuiUtils, "isFsgMode", Context.class, XC_MethodReplacement.returnConstant(true));
-                }
-
-                // INTERNAL NAV: Xiaomi internal NavigationUtils for SystemUI
-                Class<?> miuiNavUtils = XposedHelpers.findClassIfExists("com.android.systemui.NavigationUtils", lpparam.classLoader);
-                if (miuiNavUtils != null) {
-                    XposedHelpers.findAndHookMethod(miuiNavUtils, "isFsgMode", Context.class, XC_MethodReplacement.returnConstant(true));
-                }
-
-                // GESTURE STUB: Handles the back gesture touch area visibility
                 Class<?> gestureStub = XposedHelpers.findClassIfExists("com.android.systemui.statusbar.phone.GestureStubView", lpparam.classLoader);
                 if (gestureStub != null) {
                     XposedHelpers.findAndHookMethod(gestureStub, "isGestureEnable", Context.class, XC_MethodReplacement.returnConstant(true));
                 }
 
-                // AOSP FALLBACK: Modern AOSP Navigation Bar Controller for HyperOS
-                Class<?> navBarController = XposedHelpers.findClassIfExists("com.android.systemui.navigationbar.NavigationBarController", lpparam.classLoader);
-                if (navBarController != null) {
-                    XposedHelpers.findAndHookMethod(navBarController, "isGesturalMode", int.class, XC_MethodReplacement.returnConstant(true));
+                // INTERNAL XIAOMI UTILS
+                Class<?> miuiUtils = XposedHelpers.findClassIfExists("com.android.systemui.MiuiGestureUtils", lpparam.classLoader);
+                if (miuiUtils != null) {
+                    XposedHelpers.findAndHookMethod(miuiUtils, "isFsgMode", Context.class, XC_MethodReplacement.returnConstant(true));
+                }
+
+                Class<?> miuiNavUtils = XposedHelpers.findClassIfExists("com.android.systemui.NavigationUtils", lpparam.classLoader);
+                if (miuiNavUtils != null) {
+                    XposedHelpers.findAndHookMethod(miuiNavUtils, "isFsgMode", Context.class, XC_MethodReplacement.returnConstant(true));
                 }
 
             } catch (Throwable t) { Log.e(TAG, "SystemUI Hook Failed: " + t.getMessage()); }
