@@ -28,14 +28,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: wrapper
+          # Disable the aggressive cleanup that is crashing on GitHub's broken servers
+          gradle-home-cache-cleanup: false
           cache-overwrite-existing: true
-          gradle-home-cache-cleanup: true
 
-      - name: Grant Execute Permission for Gradle
+      - name: Grant Execute Permission
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
@@ -49,7 +50,7 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: "34.0.0"
 
-      - name: Prepare APK for Distribution
+      - name: Prepare APK
         run: cp ${{ steps.sign_app.outputs.signedReleaseFile }} app/build/outputs/apk/release/HGS.apk
 
       - name: Create GitHub Release
