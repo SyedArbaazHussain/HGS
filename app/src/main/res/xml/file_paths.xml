@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <cache-path name="logs" path="." />
-    
-    <external-path name="external_logs" path="Android/data/com.sah.hgs/cache" />
+    <cache-path 
+        name="internal_logs" 
+        path="." />
+
+    <external-cache-path 
+        name="external_logs" 
+        path="." />
 </paths>

@@ -1,14 +1,27 @@
 <resources>
     <string name="app_name">HGS</string>
     
-    <string name="module_description">Universal gesture enforcement and system stability for HyperOS.</string>
+    <string name="module_description">Universal gesture enforcement and system stability for HyperOS via modern libxposed.</string>
+    
+    <string name="audit_header">Universal HyperOS Audit</string>
+    <string name="diagnostic_header">Filtered Diagnostic Terminal (su)</string>
+    <string name="modern_edition_subtitle">Modern libxposed Edition</string>
     
     <string name="btn_fix">APPLY GESTURE FIX</string>
     <string name="btn_reset">FORCE CACHE RESET</string>
-    <string name="diagnostic_header">Filtered Diagnostic Terminal</string>
-    <string name="audit_header">Universal HyperOS Audit</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_clear">Clear</string>
+    <string name="btn_export">Export</string>
     
+    <string name="lsposed_checking">LSPosed: Checking…</string>
     <string name="lsposed_active">LSPosed: ACTIVE</string>
     <string name="lsposed_inactive">LSPosed: INACTIVE</string>
+    
     <string name="terminal_ready">Terminal Ready…</string>
+    <string name="terminal_started">[Log Monitor Started]</string>
+    <string name="terminal_cleared">--- Terminal Cleared ---</string>
+    <string name="buffer_purged">[Buffer Purged]</string>
+    
+    <string name="audit_initializing">Initializing Dashboard…</string>
 </resources>

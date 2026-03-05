@@ -20,8 +20,7 @@ import java.io.InputStreamReader;
 
 /**
  * Main management interface for HyperOS Gesture Fix.
- * Provides real-time system auditing, diagnostic logging, and root enforcement controls.
- * Refactored for the com.sah.hgs package and modern libxposed API.
+ * Refactored for modern libxposed API and SDK 35.
  */
 public class main extends AppCompatActivity {
 
@@ -32,10 +31,11 @@ public class main extends AppCompatActivity {
     private boolean isMonitoring = false;
 
     /**
-     * Placeholder method hooked by the modern libxposed module to verify activation.
+     * This method is hooked by the modern libxposed class (MainHook).
+     * The module will override this to return 'true' if active.
      */
     public boolean isModuleActive() {
-        return false;
+        return false; 
     }
 
     @Override
@@ -62,7 +62,6 @@ public class main extends AppCompatActivity {
 
         btnFix.setOnClickListener(v -> {
             new Thread(() -> {
-                // FIXED: Updated to lowercase shell class
                 shell.applyRootFix();
                 handler.post(() -> Toast.makeText(this, "Fix Applied", Toast.LENGTH_SHORT).show());
             }).start();
@@ -70,7 +69,6 @@ public class main extends AppCompatActivity {
 
         btnReset.setOnClickListener(v -> {
             Toast.makeText(this, "Clearing Cache & Restarting UI...", Toast.LENGTH_LONG).show();
-            // FIXED: Updated to lowercase shell class
             new Thread(shell::clearSettingsCache).start();
         });
 
@@ -84,6 +82,7 @@ public class main extends AppCompatActivity {
 
     private void startAuditLoop() {
         runSystemAudit();
+        // Periodically refresh the audit to reflect real-time system changes
         handler.postDelayed(this::startAuditLoop, 3000);
     }
 
@@ -110,6 +109,7 @@ public class main extends AppCompatActivity {
                             tvLogs.append(logLine + "\n");
                             if (scrollLog != null) scrollLog.fullScroll(ScrollView.FOCUS_DOWN);
                             
+                            // Prevent memory overflow in long monitoring sessions
                             if (tvLogs.getLineCount() > 2000) {
                                 String current = tvLogs.getText().toString();
                                 tvLogs.setText("[Buffer Purged]\n" + current.substring(current.length() / 2));
@@ -143,7 +143,6 @@ public class main extends AppCompatActivity {
             report.append(formatAuditLine("HyperOS Core", (brand.contains("xiaomi") || brand.contains("poco") || brand.contains("redmi")) ? 1 : 0));
             String navMode = checkCommandOutput("settings get secure navigation_mode").trim();
             report.append(formatAuditLine("Nav Mode (2)", navMode.equals("2") ? 1 : 0));
-
             report.append(formatAuditLine("LSPosed Hook", isModuleActive() ? 1 : 0));
 
             handler.post(() -> {

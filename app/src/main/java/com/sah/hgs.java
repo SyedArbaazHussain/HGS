@@ -3,143 +3,154 @@ package com.sah;
 import android.content.ComponentName;
 import android.content.Context;
 import android.util.Log;
+import androidx.annotation.NonNull;
 import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
-import io.github.libxposed.api.XposedModuleInterface;
+import io.github.libxposed.api.annotations.AfterInvocation;
 import io.github.libxposed.api.annotations.BeforeInvocation;
 import io.github.libxposed.api.annotations.XposedHooker;
 
 /**
  * Modern LSPosed implementation for universal gesture enforcement.
- * Uses META-INF initialization and libxposed API version 100+.
- * Updated to fix Issue #11 (Initialization/Constructor mismatch).
+ * Optimized for libxposed API 100 and SDK 35.
  */
 public class hgs extends XposedModule {
 
     private static final String TAG = "HGS_LOG";
 
-    /**
-     * Mandatory constructor for libxposed modern API.
-     * Note: Using ModuleLoadedParam is the robust way to ensure the loader 
-     * identifies the module correctly as per recent API discussions.
-     */
-    public hgs(XposedModuleInterface base, XposedModuleInterface.ModuleLoadedParam param) {
+    public hgs(@NonNull XposedInterface base, @NonNull ModuleLoadedParam param) {
         super(base, param);
     }
 
     @Override
-    public void onPackageLoaded(XposedModuleInterface.PackageLoadedParam lp) {
-        // Verification hook for your own app's UI
-        if (lp.getPackageName().equals("com.sah.hgs")) {
-            hook(lp.getClassLoader(), "com.sah.main", "isModuleActive", new ConstantTrueHooker());
+    public void onPackageLoaded(@NonNull PackageLoadedParam lp) {
+        String packageName = lp.getPackageName();
+
+        // 1. Verification hook for your own app's UI
+        if (packageName.equals("com.sah.hgs")) {
+            try {
+                hook(lp.getClassLoader().loadClass("com.sah.main").getDeclaredMethod("isModuleActive"), 
+                     ConstantTrueHooker.class);
+            } catch (Exception e) {
+                Log.e(TAG, "Own App Hook Failed", e);
+            }
         }
 
-        // Framework-level stability and settings enforcement
-        if (lp.getPackageName().equals("android")) {
+        // 2. Framework-level stability and settings enforcement
+        if (packageName.equals("android")) {
             applyFrameworkHooks(lp);
         }
 
-        // SystemUI gesture engine and navigation mode management
-        if (lp.getPackageName().equals("com.android.systemui")) {
+        // 3. SystemUI gesture engine management
+        if (packageName.equals("com.android.systemui")) {
             applySystemUIHooks(lp);
         }
     }
 
-    private void applyFrameworkHooks(XposedModuleInterface.PackageLoadedParam lp) {
+    private void applyFrameworkHooks(PackageLoadedParam lp) {
         try {
-            // Intercepts display settings to prevent Hardware Composer panics (getLuts error)
-            hook(lp.getClassLoader(), "com.android.server.display.DisplayDevice", "applyDisplaySettings",
-                 "android.view.SurfaceControl$Transaction", boolean.class, new DisplayStabilityHooker());
+            ClassLoader cl = lp.getClassLoader();
+
+            // Intercepts display settings to prevent Hardware Composer panics
+            hook(cl.loadClass("com.android.server.display.DisplayDevice")
+                    .getDeclaredMethod("applyDisplaySettings", cl.loadClass("android.view.SurfaceControl$Transaction"), boolean.class),
+                    DisplayStabilityHooker.class);
 
             // Enforces navigation overlays regardless of system state
-            hook(lp.getClassLoader(), "com.android.server.om.OverlayManagerService", "setEnabled",
-                 String.class, boolean.class, int.class, new OverlayEnforcementHooker());
+            hook(cl.loadClass("com.android.server.om.OverlayManagerService")
+                    .getDeclaredMethod("setEnabled", String.class, boolean.class, int.class),
+                    OverlayEnforcementHooker.class);
 
             // Prevents launcher fallback to MIUI Home variants
-            hook(lp.getClassLoader(), "com.android.server.wm.ActivityTaskManagerService", "updateDefaultHomeActivity",
-                 ComponentName.class, new HomeProtectionHooker());
+            hook(cl.loadClass("com.android.server.wm.ActivityTaskManagerService")
+                    .getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class),
+                    HomeProtectionHooker.class);
 
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            Log.e(TAG, "Framework Hook Failure", t);
+        }
     }
 
-    private void applySystemUIHooks(XposedModuleInterface.PackageLoadedParam lp) {
+    private void applySystemUIHooks(PackageLoadedParam lp) {
         try {
-            // Stabilizes transitions during resolution/density changes
-            hook(lp.getClassLoader(), "com.android.systemui.statusbar.phone.MiuiNotificationPanelViewControllerInjector", 
-                 "onConfigurationChanged", "android.content.res.Configuration", new GenericStabilizerHooker());
+            ClassLoader cl = lp.getClassLoader();
 
             // Locks navigation mode to Gestural (2)
-            hook(lp.getClassLoader(), "com.android.systemui.navigationbar.NavigationModeController", 
-                 "onRequestedNavigationModeChange", int.class, new NavModeForcerHooker());
-            
-            hook(lp.getClassLoader(), "com.android.systemui.navigationbar.NavigationModeController", 
-                 "getNavigationMode", new ConstantTwoHooker());
+            hook(cl.loadClass("com.android.systemui.navigationbar.NavigationModeController")
+                    .getDeclaredMethod("onRequestedNavigationModeChange", int.class),
+                    NavModeForcerHooker.class);
+
+            hook(cl.loadClass("com.android.systemui.navigationbar.NavigationModeController")
+                    .getDeclaredMethod("getNavigationMode"),
+                    ConstantTwoHooker.class);
 
             // Forces high-sensitivity gesture regions (Stub enforcement)
-            hook(lp.getClassLoader(), "com.android.systemui.statusbar.phone.MiuiGestureStubView", 
-                 "isGestureEnable", Context.class, new ConstantTrueHooker());
+            hook(cl.loadClass("com.android.systemui.statusbar.phone.MiuiGestureStubView")
+                    .getDeclaredMethod("isGestureEnable", Context.class),
+                    ConstantTrueHooker.class);
 
-        } catch (Throwable t) { Log.e(TAG, "SystemUI Hook Failed: " + t.getMessage()); }
+        } catch (Throwable t) {
+            Log.e(TAG, "SystemUI Hook Failure", t);
+        }
     }
 
+    // --- HOOKER IMPLEMENTATIONS ---
+    // Modern API recommends static hooker classes for better R8 optimization
+
     @XposedHooker
-    class DisplayStabilityHooker implements XposedInterface.Hooker {
+    public static class ConstantTrueHooker implements XposedInterface.Hooker {
         @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            Log.d(TAG, "Syncing universal display transaction");
+        public static void before(XposedInterface.BeforeHookCallback cb) {
+            cb.setResult(true);
         }
     }
 
     @XposedHooker
-    class OverlayEnforcementHooker implements XposedInterface.Hooker {
+    public static class ConstantTwoHooker implements XposedInterface.Hooker {
         @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            String pkg = (String) callback.getArgs()[0];
-            boolean enable = (boolean) callback.getArgs()[1];
-            if (pkg.contains("navbar.gestural") && !enable) callback.setResult(true);
+        public static void before(XposedInterface.BeforeHookCallback cb) {
+            cb.setResult(2);
         }
     }
 
     @XposedHooker
-    class HomeProtectionHooker implements XposedInterface.Hooker {
+    public static class NavModeForcerHooker implements XposedInterface.Hooker {
         @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            ComponentName cn = (ComponentName) callback.getArgs()[0];
-            if (cn != null && (cn.getPackageName().contains("miui.home") || cn.getPackageName().contains("mi.launcher"))) {
-                callback.setResult(null);
+        public static void before(XposedInterface.BeforeHookCallback cb) {
+            // Forces the input argument of onRequestedNavigationModeChange to 2
+            cb.getArgs()[0] = 2;
+        }
+    }
+
+    @XposedHooker
+    public static class OverlayEnforcementHooker implements XposedInterface.Hooker {
+        @BeforeInvocation
+        public static void before(XposedInterface.BeforeHookCallback cb) {
+            String pkg = (String) cb.getArgs()[0];
+            boolean enable = (boolean) cb.getArgs()[1];
+            // If system tries to disable gestural navbar, force result to true (keep enabled)
+            if (pkg != null && pkg.contains("navbar.gestural") && !enable) {
+                cb.setResult(true);
             }
         }
     }
 
     @XposedHooker
-    class NavModeForcerHooker implements XposedInterface.Hooker {
+    public static class HomeProtectionHooker implements XposedInterface.Hooker {
         @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            callback.getArgs()[0] = 2;
+        public static void before(XposedInterface.BeforeHookCallback cb) {
+            ComponentName cn = (ComponentName) cb.getArgs()[0];
+            if (cn != null && (cn.getPackageName().contains("miui.home") || cn.getPackageName().contains("mi.launcher"))) {
+                cb.setResult(null); // Prevent setting MIUI launcher as default
+            }
         }
     }
 
     @XposedHooker
-    class GenericStabilizerHooker implements XposedInterface.Hooker {
-        @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            Log.d(TAG, "Universal Stability Interceptor Active");
-        }
-    }
-
-    @XposedHooker
-    class ConstantTrueHooker implements XposedInterface.Hooker {
-        @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            callback.setResult(true);
-        }
-    }
-
-    @XposedHooker
-    class ConstantTwoHooker implements XposedInterface.Hooker {
-        @BeforeInvocation
-        public void before(XposedInterface.BeforeHookCallback callback) {
-            callback.setResult(2);
+    public static class DisplayStabilityHooker implements XposedInterface.Hooker {
+        @AfterInvocation
+        public static void after(XposedInterface.AfterHookCallback cb) {
+            Log.d(TAG, "Display transaction intercepted");
         }
     }
 }

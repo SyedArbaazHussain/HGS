@@ -1,27 +1,39 @@
-# Allows obfuscation of entry points by adapting resource filename references
-# This ensures META-INF/xposed/java_init.list stays synchronized
+# 1. Resource Synchronization
+# Ensures java_init.list is updated if classes are renamed
 -adaptresourcefilenames META-INF/xposed/*.list
+-adaptresourcecontents META-INF/xposed/*.list
 
-# Protect the Xposed Entry Point
--keep class com.sah.hgs { *; }
+# 2. Xposed Entry Point Protection
+# Do not rename or remove the main module class
+-keep names class com.sah.hgs { *; }
 
-# Protect the UI and the specific hook target method
--keep class com.sah.main {
+# 3. UI & Internal Hook Protection
+# Specifically keep the method hooked by the module to verify status
+-keepnames class com.sah.main {
     public boolean isModuleActive();
     *;
 }
 
-# Protect logic required for root shell execution and boot persistence
+# 4. Process Stability Protection
+# Protect classes that handle su shell execution and boot signals
 -keep class com.sah.boot { *; }
 -keep class com.sah.shell { *; }
 
-# Prevents stripping of libxposed API and annotated hookers
--keep class io.github.libxposed.api.** { *; }
+# 5. Libxposed API & Annotation Protection
+# Required for the framework to find and execute your hooks via annotations
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class io.github.libxposed.api.** { *; }
 
-# Specifically protect your @XposedHooker inner classes in hgs.java
+# 6. Annotated Hooker Protection
+# Prevents R8 from shrinking the static hooker classes and their callback methods
 -keep @io.github.libxposed.api.annotations.XposedHooker class * { *; }
 -keepclassmembers class * {
-    @io.github.libxposed.api.annotations.BeforeInvocation *;
-    @io.github.libxposed.api.annotations.AfterInvocation *;
+    @io.github.libxposed.api.annotations.BeforeInvocation public static void before(io.github.libxposed.api.XposedInterface$BeforeHookCallback);
+    @io.github.libxposed.api.annotations.AfterInvocation public static void after(io.github.libxposed.api.XposedInterface$AfterHookCallback);
+}
+
+# 7. General Android Stability for SDK 35
+-dontwarn android.util.**
+-keepclassmembers class * extends android.app.Activity {
+   public void *(android.view.View);
 }

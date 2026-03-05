@@ -6,12 +6,14 @@
     <color name="background_dark">#0F0F0F</color>
     <color name="card_background">#1E1E1E</color>
     <color name="terminal_background">#1A1A1A</color>
-    
+    <color name="audit_background">#2A2A2A</color>
     <color name="status_green">#4CAF50</color>
     <color name="status_red">#F44336</color>
+    <color name="status_warning">#FFEB3B</color>
     <color name="action_blue">#2196F3</color>
     <color name="action_orange">#FF9800</color>
-    
+    <color name="action_stop">#FF5252</color>
+    <color name="terminal_text_green">#00FF00</color>
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#AAAAAA</color>
     <color name="text_muted">#666666</color>
