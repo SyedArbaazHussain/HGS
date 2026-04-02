@@ -7,6 +7,7 @@ import android.content.pm.ResolveInfo;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import io.github.libxposed.api.XposedModule;
+import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModuleInterface;
 import java.lang.reflect.Method;
 import java.util.Collections;
@@ -27,7 +28,7 @@ public class mainhook extends XposedModule {
         super(nativeContext, moduleContext);
     }
 
-    private XposedModuleInterface.Hooker hooker(Method method) {
+    private XposedInterface.Hooker hooker(Method method) {
         return hook(method);
     }
 
