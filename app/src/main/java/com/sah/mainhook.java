@@ -8,7 +8,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedInterface;
-import io.github.libxposed.api.XposedModuleInterface;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashSet;
@@ -23,24 +22,22 @@ public class mainhook extends XposedModule {
     private static final long CACHE_EXPIRY = TimeUnit.MINUTES.toMillis(10);
     private final Set<String> launcherCache = Collections.synchronizedSet(new HashSet<>());
     private long lastUpdate = 0;
+    private final ModuleContext mModContext;
 
-    public mainhook(@NonNull XposedModuleInterface.NativeContext nativeContext, @NonNull XposedModuleInterface.ModuleContext moduleContext) {
+    public mainhook(@NonNull NativeContext nativeContext, @NonNull ModuleContext moduleContext) {
         super(nativeContext, moduleContext);
-    }
-
-    private XposedInterface.Hooker hooker(Method method) {
-        return hook(method);
+        this.mModContext = moduleContext;
     }
 
     @Override
     public void onPackageLoaded(@NonNull PackageLoadedParam param) {
         String pkg = param.getPackageName();
-        ClassLoader loader = param.getClassLoader();
+        ClassLoader loader = param.getAppInfo().classLoader;
 
         if (pkg.equals("com.sah.hgs")) {
             try {
                 Class<?> mainActivity = loader.loadClass("com.sah.main");
-                hooker(mainActivity.getDeclaredMethod("isModuleActive")).replace(true);
+                hook(mainActivity.getDeclaredMethod("isModuleActive")).replace(callback -> true);
             } catch (Exception e) {
                 Log.e(TAG, "S-H-F", e);
             }
@@ -61,20 +58,20 @@ public class mainhook extends XposedModule {
 
     private void applyFrameworkHooks(ClassLoader loader) {
         try {
-            hooker(loader.loadClass("android.view.ViewConfiguration").getDeclaredMethod("isDefaultScrollCaptureEnabled")).replace(true);
+            hook(loader.loadClass("android.view.ViewConfiguration").getDeclaredMethod("isDefaultScrollCaptureEnabled")).replace(callback -> true);
 
             try {
-                hooker(loader.loadClass("android.hardware.display.DisplayManager").getDeclaredMethod("getCompositionLuts")).replace(null);
+                hook(loader.loadClass("android.hardware.display.DisplayManager").getDeclaredMethod("getCompositionLuts")).replace(callback -> null);
             } catch (NoSuchMethodException e) {
                 try {
-                    hooker(loader.loadClass("android.hardware.display.IDisplayManager$Stub$Proxy").getDeclaredMethod("getCompositionLuts")).replace(null);
+                    hook(loader.loadClass("android.hardware.display.IDisplayManager$Stub$Proxy").getDeclaredMethod("getCompositionLuts")).replace(callback -> null);
                 } catch (Exception ignored) {}
             }
 
             Class<?> atm = loader.loadClass("com.android.server.wm.ActivityTaskManagerService");
-            hooker(atm.getDeclaredMethod("isRecentsComponentHomeActivity", int.class)).replace(true);
+            hook(atm.getDeclaredMethod("isRecentsComponentHomeActivity", int.class)).replace(callback -> true);
             
-            hooker(atm.getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class)).before(callback -> {
+            hook(atm.getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class)).before(callback -> {
                 ComponentName cn = (ComponentName) callback.getArgs()[0];
                 if (cn != null && (cn.getPackageName().contains("miui.home") || cn.getPackageName().contains("mi.launcher"))) {
                     callback.returnAndSkip(null);
@@ -83,7 +80,7 @@ public class mainhook extends XposedModule {
 
             try {
                 Class<?> pms = loader.loadClass("com.android.server.pm.PackageManagerService");
-                hooker(pms.getDeclaredMethod("isSystemApp", String.class)).before(callback -> {
+                hook(pms.getDeclaredMethod("isSystemApp", String.class)).before(callback -> {
                     String targetPkg = (String) callback.getArgs()[0];
                     if (isTargetPackage(targetPkg)) {
                         callback.returnAndSkip(true);
@@ -93,7 +90,7 @@ public class mainhook extends XposedModule {
 
             try {
                 Class<?> oms = loader.loadClass("com.android.server.om.OverlayManagerService");
-                hooker(oms.getDeclaredMethod("setEnabled", String.class, boolean.class, int.class)).before(callback -> {
+                hook(oms.getDeclaredMethod("setEnabled", String.class, boolean.class, int.class)).before(callback -> {
                     String overlayPkg = (String) callback.getArgs()[0];
                     if (overlayPkg != null && overlayPkg.contains("navbar.gestural")) {
                         callback.getArgs()[1] = true;
@@ -109,19 +106,19 @@ public class mainhook extends XposedModule {
     private void applySystemUIHooks(ClassLoader loader) {
         try {
             Class<?> navCtrl = loader.loadClass("com.android.systemui.navigationbar.NavigationModeController");
-            hooker(navCtrl.getDeclaredMethod("getNavigationMode")).replace(NAV_BAR_MODE_GESTURAL);
-            hooker(navCtrl.getDeclaredMethod("onRequestedNavigationModeChange", int.class)).before(callback -> {
+            hook(navCtrl.getDeclaredMethod("getNavigationMode")).replace(callback -> NAV_BAR_MODE_GESTURAL);
+            hook(navCtrl.getDeclaredMethod("onRequestedNavigationModeChange", int.class)).before(callback -> {
                 callback.getArgs()[0] = NAV_BAR_MODE_GESTURAL;
             });
 
             try {
                 Class<?> gestureStub = loader.loadClass("com.android.systemui.statusbar.phone.MiuiGestureStubView");
-                hooker(gestureStub.getDeclaredMethod("isGestureEnable", Context.class)).replace(true);
+                hook(gestureStub.getDeclaredMethod("isGestureEnable", Context.class)).replace(callback -> true);
             } catch (Exception ignored) {}
 
             try {
                 Class<?> proxy = loader.loadClass("com.android.systemui.recents.OverviewProxyService");
-                hooker(proxy.getDeclaredMethod("isEnabled")).replace(true);
+                hook(proxy.getDeclaredMethod("isEnabled")).replace(callback -> true);
             } catch (Exception ignored) {}
 
         } catch (Throwable t) {
@@ -132,9 +129,9 @@ public class mainhook extends XposedModule {
     private void applyMiuiHomeHooks(ClassLoader loader) {
         try {
             Class<?> config = loader.loadClass("com.miui.home.launcher.DeviceConfig");
-            hooker(config.getDeclaredMethod("isSystemLauncher")).replace(true);
+            hook(config.getDeclaredMethod("isSystemLauncher")).replace(callback -> true);
             try {
-                hooker(config.getDeclaredMethod("isSupportGesture")).replace(true);
+                hook(config.getDeclaredMethod("isSupportGesture")).replace(callback -> true);
             } catch (NoSuchMethodException ignored) {}
         } catch (Throwable t) {
             Log.e(TAG, "MH-H-F", t);
@@ -155,7 +152,7 @@ public class mainhook extends XposedModule {
     private void updateCache() {
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-            List<ResolveInfo> resolves = getModuleContext().getPackageManager().queryIntentActivities(intent, 0);
+            List<ResolveInfo> resolves = mModContext.getPackageManager().queryIntentActivities(intent, 0);
             
             synchronized (launcherCache) {
                 launcherCache.clear();
