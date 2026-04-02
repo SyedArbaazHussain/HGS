@@ -68,10 +68,10 @@ public class mainhook extends XposedModule {
 
         if (pkg.equals("com.sah.hgs")) {
             try {
-                Method isModuleActive = loader.loadClass("com.sah.main").getDeclaredMethod("isModuleActive");
-                hook(isModuleActive, BeforeHooker.class);
+                Method m = loader.loadClass("com.sah.main").getDeclaredMethod("isModuleActive");
+                hook(m, BeforeHooker.class);
             } catch (Exception e) {
-                Log.e(TAG, "S-H-F", e);
+                Log.e(TAG, "Self-hook failed", e);
             }
         }
 
@@ -102,7 +102,7 @@ public class mainhook extends XposedModule {
             hook(atm.getDeclaredMethod("isRecentsComponentHomeActivity", int.class), BeforeHooker.class);
             hook(atm.getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class), UpdateDefaultHomeHooker.class);
         } catch (Throwable t) {
-            Log.e(TAG, "F-H-F", t);
+            Log.e(TAG, "Framework hooks failed", t);
         }
     }
 
@@ -112,7 +112,7 @@ public class mainhook extends XposedModule {
             hook(navCtrl.getDeclaredMethod("getNavigationMode"), GetNavModeHooker.class);
             hook(navCtrl.getDeclaredMethod("onRequestedNavigationModeChange", int.class), OnNavChangeHooker.class);
         } catch (Throwable t) {
-            Log.e(TAG, "SUI-H-F", t);
+            Log.e(TAG, "SystemUI hooks failed", t);
         }
     }
 
@@ -124,7 +124,7 @@ public class mainhook extends XposedModule {
                 hook(config.getDeclaredMethod("isSupportGesture"), BeforeHooker.class);
             } catch (NoSuchMethodException ignored) {}
         } catch (Throwable t) {
-            Log.e(TAG, "MH-H-F", t);
+            Log.e(TAG, "MiuiHome hooks failed", t);
         }
     }
 }
