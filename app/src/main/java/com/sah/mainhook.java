@@ -22,9 +22,9 @@ public class mainhook extends XposedModule {
     private static final long CACHE_EXPIRY = TimeUnit.MINUTES.toMillis(10);
     private final Set<String> launcherCache = Collections.synchronizedSet(new HashSet<>());
     private long lastUpdate = 0;
-    private final ModuleContext mModContext;
+    private final XposedModule.ModuleContext mModContext;
 
-    public mainhook(@NonNull NativeContext nativeContext, @NonNull ModuleContext moduleContext) {
+    public mainhook(@NonNull XposedModule.NativeContext nativeContext, @NonNull XposedModule.ModuleContext moduleContext) {
         super(nativeContext, moduleContext);
         this.mModContext = moduleContext;
     }
@@ -32,7 +32,7 @@ public class mainhook extends XposedModule {
     @Override
     public void onPackageLoaded(@NonNull PackageLoadedParam param) {
         String pkg = param.getPackageName();
-        ClassLoader loader = param.getAppInfo().classLoader;
+        ClassLoader loader = param.getClassLoader();
 
         if (pkg.equals("com.sah.hgs")) {
             try {
