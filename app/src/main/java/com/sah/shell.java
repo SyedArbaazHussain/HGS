@@ -1,56 +1,33 @@
 package com.sah;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
-import java.io.DataOutputStream;
-import java.io.IOException;
 
-public class shell {
+public class boot extends BroadcastReceiver {
 
-    private static final String TAG = "HGS_SHELL";
+    private static final String TAG = "HGS_BOOT";
 
-    public static void applyRootFix() {
-        String[] commands = {
-            "settings put secure navigation_mode 2",
-            "settings put global force_fsg_nav_bar 1",
-            "settings put secure miui_fsg_gesture_status 1",
-            "content call --uri content://settings/secure --method GET_secure --arg navigation_mode",
-            "wm size reset",
-            "cmd overlay enable com.android.internal.systemui.navbar.gestural",
-            "am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS"
-        };
-        runAsRoot(commands);
-    }
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        String action = intent.getAction();
+        if (action == null) return;
 
-    public static void clearSettingsCache() {
-        String[] commands = {
-            "rm -rf /data/system/users/0/settings_*.xml",
-            "pkill -9 com.android.systemui"
-        };
-        runAsRoot(commands);
-    }
-
-    private static void runAsRoot(String[] commands) {
-        Process p = null;
-        DataOutputStream os = null;
-        try {
-            p = Runtime.getRuntime().exec("su");
-            os = new DataOutputStream(p.getOutputStream());
-
-            for (String cmd : commands) {
-                os.writeBytes(cmd + "\n");
-            }
+        if (action.equals(Intent.ACTION_BOOT_COMPLETED) || 
+            action.equals(Intent.ACTION_LOCKED_BOOT_COMPLETED) ||
+            action.equals("android.intent.action.QUICKBOOT_POWERON")) {
             
-            os.writeBytes("exit\n");
-            os.flush();
-            p.waitFor();
+            Log.d(TAG, "Boot detected: " + action);
             
-        } catch (IOException | InterruptedException e) {
-            Log.e(TAG, "E: " + e.getMessage());
-        } finally {
-            try {
-                if (os != null) os.close();
-            } catch (IOException ignored) {}
-            if (p != null) p.destroy();
+            new Thread(() -> {
+                try {
+                    Thread.sleep(5000);
+                    shell.applyRootFix();
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "Boot fix interrupted", e);
+                }
+            }).start();
         }
     }
 }

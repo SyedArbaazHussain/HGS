@@ -25,10 +25,6 @@
             android:value="101" />
 
         <meta-data
-            android:name="xposedmoduleclass"
-            android:value="com.sah.mainhook" />
-
-        <meta-data
             android:name="xposedscope"
             android:value="android;com.android.systemui;com.sah.hgs;com.miui.home" />
 

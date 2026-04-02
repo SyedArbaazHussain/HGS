@@ -15,6 +15,7 @@ public class boot extends BroadcastReceiver {
 
         if (action.equals(Intent.ACTION_BOOT_COMPLETED) || 
             action.equals(Intent.ACTION_LOCKED_BOOT_COMPLETED) ||
+            action.equals("android.intent.action.QUICKBOOT_POWERON") ||
             action.equals(Intent.ACTION_REBOOT)) {
             
             final PendingResult pendingResult = goAsync();

@@ -12,6 +12,11 @@ android {
         targetSdk 35
         versionCode 13
         versionName "1.3-Modern"
+        
+        javaCompileOptions {
+            annotationProcessorOptions {
+            }
+        }
     }
 
     buildFeatures {
@@ -25,7 +30,7 @@ android {
     
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled false 
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -35,6 +40,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+
     compileOnly 'io.github.libxposed:api:101.0.1'
     annotationProcessor 'io.github.libxposed:api:101.0.1'
 }
