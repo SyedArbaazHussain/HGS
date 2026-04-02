@@ -26,7 +26,6 @@ public class main extends AppCompatActivity {
     private Process logcatProcess;
     private boolean isMonitoring = false;
 
-    // This method is replaced by MainHook.java to return true
     public boolean isModuleActive() {
         return false; 
     }
@@ -97,6 +96,8 @@ public class main extends AppCompatActivity {
                 }
             } catch (Exception e) {
                 handler.post(() -> { if (tvLogs != null) tvLogs.append("Error: " + e.getMessage() + "\n"); });
+            } finally {
+                stopLogcatMonitor();
             }
         }).start();
     }
@@ -123,7 +124,9 @@ public class main extends AppCompatActivity {
             report.append(formatAuditLine("LSPosed Hook", isModuleActive() ? 1 : 0));
 
             handler.post(() -> {
-                if (tvAudit != null) tvAudit.setText(Html.fromHtml(report.toString(), Html.FROM_HTML_MODE_COMPACT));
+                if (tvAudit != null && !isFinishing()) {
+                    tvAudit.setText(Html.fromHtml(report.toString(), Html.FROM_HTML_MODE_COMPACT));
+                }
                 updateLSPosedStatus();
             });
         }).start();
@@ -140,6 +143,7 @@ public class main extends AppCompatActivity {
             Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = reader.readLine();
+            p.destroy();
             return (line != null) ? line : "null";
         } catch (Exception e) { return "err"; }
     }
@@ -151,8 +155,11 @@ public class main extends AppCompatActivity {
             if (tvLogs != null) stream.write(tvLogs.getText().toString().getBytes());
             stream.close();
             Uri uri = FileProvider.getUriForFile(this, "com.sah.hgs.fileprovider", logFile);
-            startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain")
-                    .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Share Report"));
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_STREAM, uri);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(intent, "Share Report"));
         } catch (Exception e) { Toast.makeText(this, "Export Failed", Toast.LENGTH_SHORT).show(); }
     }
 
@@ -167,6 +174,7 @@ public class main extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         stopLogcatMonitor();
+        handler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 }

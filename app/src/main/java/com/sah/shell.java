@@ -4,18 +4,10 @@ import android.util.Log;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * Optimized Root Utilities for HyperOS Gesture Fix.
- * Refactored for process stability on SDK 35 and modern libxposed integration.
- */
 public class shell {
 
     private static final String TAG = "HGS_SHELL";
 
-    /**
-     * Executes core gesture engine fixes via root shell.
-     * Uses a single 'su' session for efficiency to avoid multiple prompt overhead.
-     */
     public static void applyRootFix() {
         String[] commands = {
             "settings put secure navigation_mode 2",
@@ -29,9 +21,6 @@ public class shell {
         runAsRoot(commands);
     }
 
-    /**
-     * Clears settings cache and force-restarts SystemUI to apply changes.
-     */
     public static void clearSettingsCache() {
         String[] commands = {
             "rm -rf /data/system/users/0/settings_*.xml",
@@ -40,10 +29,6 @@ public class shell {
         runAsRoot(commands);
     }
 
-    /**
-     * Internal helper to execute a batch of commands in a single root process.
-     * Implements proper stream closing to prevent memory leaks in modern Android.
-     */
     private static void runAsRoot(String[] commands) {
         Process p = null;
         DataOutputStream os = null;
@@ -60,12 +45,12 @@ public class shell {
             p.waitFor();
             
         } catch (IOException | InterruptedException e) {
-            Log.e(TAG, "Root execution failed: " + e.getMessage());
+            Log.e(TAG, "E: " + e.getMessage());
         } finally {
             try {
                 if (os != null) os.close();
-                if (p != null) p.destroy();
             } catch (IOException ignored) {}
+            if (p != null) p.destroy();
         }
     }
 }
