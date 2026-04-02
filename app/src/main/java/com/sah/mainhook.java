@@ -8,6 +8,9 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedInterface;
+import io.github.libxposed.api.annotations.BeforeInvocation;
+import io.github.libxposed.api.annotations.XposedHooker;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -22,17 +25,22 @@ public class mainhook extends XposedModule {
     private final Set<String> launcherCache = Collections.synchronizedSet(new HashSet<>());
     private long lastUpdate = 0;
 
-    public mainhook(@NonNull XposedInterface base, @NonNull ModuleLoadedParam param) {
-        super(base, param);
+    // API 101: Constructor must not take arguments
+    public mainhook() {
+        super();
     }
 
-    public static class BeforeHooker {
+    @XposedHooker
+    public static class BeforeHooker implements XposedInterface.Hooker {
+        @BeforeInvocation
         public static void before(XposedInterface.BeforeHookCallback callback) {
             callback.setResult(true);
         }
     }
 
-    public static class SetResultNullHooker {
+    @XposedHooker
+    public static class SetResultNullHooker implements XposedInterface.Hooker {
+        @BeforeInvocation
         public static void before(XposedInterface.BeforeHookCallback callback) {
             callback.setResult(null);
         }
@@ -79,32 +87,16 @@ public class mainhook extends XposedModule {
             Class<?> atm = loader.loadClass("com.android.server.wm.ActivityTaskManagerService");
             hook(atm.getDeclaredMethod("isRecentsComponentHomeActivity", int.class), BeforeHooker.class);
             
-            hook(atm.getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class), (XposedInterface.BeforeHookCallback callback) -> {
-                ComponentName cn = (ComponentName) callback.getArgs()[0];
-                if (cn != null && (cn.getPackageName().contains("miui.home") || cn.getPackageName().contains("mi.launcher"))) {
-                    callback.setResult(null);
+            // Manual lambda hook for dynamic logic
+            hook(atm.getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class), new XposedInterface.Hooker() {
+                @BeforeInvocation
+                public void before(XposedInterface.BeforeHookCallback callback) {
+                    ComponentName cn = (ComponentName) callback.getArgs()[0];
+                    if (cn != null && (cn.getPackageName().contains("miui.home") || cn.getPackageName().contains("mi.launcher"))) {
+                        callback.setResult(null);
+                    }
                 }
             });
-
-            try {
-                Class<?> pms = loader.loadClass("com.android.server.pm.PackageManagerService");
-                hook(pms.getDeclaredMethod("isSystemApp", String.class), (XposedInterface.BeforeHookCallback callback) -> {
-                    String targetPkg = (String) callback.getArgs()[0];
-                    if (isTargetPackage(targetPkg)) {
-                        callback.setResult(true);
-                    }
-                });
-            } catch (Exception ignored) {}
-
-            try {
-                Class<?> oms = loader.loadClass("com.android.server.om.OverlayManagerService");
-                hook(oms.getDeclaredMethod("setEnabled", String.class, boolean.class, int.class), (XposedInterface.BeforeHookCallback callback) -> {
-                    String overlayPkg = (String) callback.getArgs()[0];
-                    if (overlayPkg != null && overlayPkg.contains("navbar.gestural")) {
-                        callback.getArgs()[1] = true;
-                    }
-                });
-            } catch (Exception ignored) {}
 
         } catch (Throwable t) {
             Log.e(TAG, "F-H-F", t);
@@ -114,22 +106,20 @@ public class mainhook extends XposedModule {
     private void applySystemUIHooks(ClassLoader loader) {
         try {
             Class<?> navCtrl = loader.loadClass("com.android.systemui.navigationbar.NavigationModeController");
-            hook(navCtrl.getDeclaredMethod("getNavigationMode"), (XposedInterface.BeforeHookCallback callback) -> {
-                callback.setResult(NAV_BAR_MODE_GESTURAL);
-            });
-            hook(navCtrl.getDeclaredMethod("onRequestedNavigationModeChange", int.class), (XposedInterface.BeforeHookCallback callback) -> {
-                callback.getArgs()[0] = NAV_BAR_MODE_GESTURAL;
+            
+            hook(navCtrl.getDeclaredMethod("getNavigationMode"), new XposedInterface.Hooker() {
+                @BeforeInvocation
+                public void before(XposedInterface.BeforeHookCallback callback) {
+                    callback.setResult(NAV_BAR_MODE_GESTURAL);
+                }
             });
 
-            try {
-                Class<?> gestureStub = loader.loadClass("com.android.systemui.statusbar.phone.MiuiGestureStubView");
-                hook(gestureStub.getDeclaredMethod("isGestureEnable", Context.class), BeforeHooker.class);
-            } catch (Exception ignored) {}
-
-            try {
-                Class<?> proxy = loader.loadClass("com.android.systemui.recents.OverviewProxyService");
-                hook(proxy.getDeclaredMethod("isEnabled"), BeforeHooker.class);
-            } catch (Exception ignored) {}
+            hook(navCtrl.getDeclaredMethod("onRequestedNavigationModeChange", int.class), new XposedInterface.Hooker() {
+                @BeforeInvocation
+                public void before(XposedInterface.BeforeHookCallback callback) {
+                    callback.getArgs()[0] = NAV_BAR_MODE_GESTURAL;
+                }
+            });
 
         } catch (Throwable t) {
             Log.e(TAG, "SUI-H-F", t);
@@ -148,21 +138,11 @@ public class mainhook extends XposedModule {
         }
     }
 
-    private boolean isTargetPackage(String pkg) {
-        if (pkg == null) return false;
-        if (pkg.equals("com.sah.hgs")) return true;
-
-        long now = System.currentTimeMillis();
-        if (now - lastUpdate > CACHE_EXPIRY || launcherCache.isEmpty()) {
-            updateCache();
-        }
-        return launcherCache.contains(pkg);
-    }
-
     private void updateCache() {
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-            List<ResolveInfo> resolves = getAndroidContext().getPackageManager().queryIntentActivities(intent, 0);
+            // In API 101, use getSystemContext() if available or the base interface
+            List<ResolveInfo> resolves = getSystemContext().getPackageManager().queryIntentActivities(intent, 0);
             
             synchronized (launcherCache) {
                 launcherCache.clear();
