@@ -8,6 +8,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -26,13 +27,18 @@ public class mainhook extends XposedModule {
         super(nativeContext, moduleContext);
     }
 
+    private XposedModuleInterface.Hooker hooker(Method method) {
+        return hook(method);
+    }
+
     @Override
-    public void onPackageReady(@NonNull PackageReadyParam param) {
+    public void onPackageLoaded(@NonNull PackageLoadedParam param) {
         String pkg = param.getPackageName();
+        ClassLoader loader = param.getClassLoader();
 
         if (pkg.equals("com.sah.hgs")) {
             try {
-                Class<?> mainActivity = param.getClassLoader().loadClass("com.sah.main");
+                Class<?> mainActivity = loader.loadClass("com.sah.main");
                 hooker(mainActivity.getDeclaredMethod("isModuleActive")).replace(true);
             } catch (Exception e) {
                 Log.e(TAG, "S-H-F", e);
@@ -40,22 +46,20 @@ public class mainhook extends XposedModule {
         }
 
         if (pkg.equals("android")) {
-            applyFrameworkHooks(param);
+            applyFrameworkHooks(loader);
         }
 
         if (pkg.equals("com.android.systemui")) {
-            applySystemUIHooks(param);
+            applySystemUIHooks(loader);
         }
 
         if (pkg.equals("com.miui.home")) {
-            applyMiuiHomeHooks(param);
+            applyMiuiHomeHooks(loader);
         }
     }
 
-    private void applyFrameworkHooks(PackageReadyParam param) {
+    private void applyFrameworkHooks(ClassLoader loader) {
         try {
-            ClassLoader loader = param.getClassLoader();
-            
             hooker(loader.loadClass("android.view.ViewConfiguration").getDeclaredMethod("isDefaultScrollCaptureEnabled")).replace(true);
 
             try {
@@ -67,7 +71,6 @@ public class mainhook extends XposedModule {
             }
 
             Class<?> atm = loader.loadClass("com.android.server.wm.ActivityTaskManagerService");
-            
             hooker(atm.getDeclaredMethod("isRecentsComponentHomeActivity", int.class)).replace(true);
             
             hooker(atm.getDeclaredMethod("updateDefaultHomeActivity", ComponentName.class)).before(callback -> {
@@ -102,10 +105,8 @@ public class mainhook extends XposedModule {
         }
     }
 
-    private void applySystemUIHooks(PackageReadyParam param) {
+    private void applySystemUIHooks(ClassLoader loader) {
         try {
-            ClassLoader loader = param.getClassLoader();
-
             Class<?> navCtrl = loader.loadClass("com.android.systemui.navigationbar.NavigationModeController");
             hooker(navCtrl.getDeclaredMethod("getNavigationMode")).replace(NAV_BAR_MODE_GESTURAL);
             hooker(navCtrl.getDeclaredMethod("onRequestedNavigationModeChange", int.class)).before(callback -> {
@@ -127,9 +128,9 @@ public class mainhook extends XposedModule {
         }
     }
 
-    private void applyMiuiHomeHooks(PackageReadyParam param) {
+    private void applyMiuiHomeHooks(ClassLoader loader) {
         try {
-            Class<?> config = param.getClassLoader().loadClass("com.miui.home.launcher.DeviceConfig");
+            Class<?> config = loader.loadClass("com.miui.home.launcher.DeviceConfig");
             hooker(config.getDeclaredMethod("isSystemLauncher")).replace(true);
             try {
                 hooker(config.getDeclaredMethod("isSupportGesture")).replace(true);
