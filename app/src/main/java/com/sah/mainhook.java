@@ -7,6 +7,7 @@ import android.content.pm.ResolveInfo;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import io.github.libxposed.api.XposedModule;
+import io.github.libxposed.api.XposedModuleInterface;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -21,7 +22,7 @@ public class mainhook extends XposedModule {
     private final Set<String> launcherCache = Collections.synchronizedSet(new HashSet<>());
     private long lastUpdate = 0;
 
-    public mainhook(@NonNull NativeContext nativeContext, @NonNull ModuleContext moduleContext) {
+    public mainhook(@NonNull XposedModuleInterface.NativeContext nativeContext, @NonNull XposedModuleInterface.ModuleContext moduleContext) {
         super(nativeContext, moduleContext);
     }
 
