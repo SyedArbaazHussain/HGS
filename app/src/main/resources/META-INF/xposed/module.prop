@@ -1,3 +1,7 @@
-minApiVersion=100
-targetApiVersion=100
-staticScope=true
+name=HGS - HyperOS Gesture Spoof
+version=1.3-Modern
+versionCode=13
+author=Syed Arbaaz Hussain
+description=Enables 3rd party launcher gestures on HyperOS by spoofing system launcher status.
+minApi=100
+targetApi=101

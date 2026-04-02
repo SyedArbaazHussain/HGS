@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -14,8 +15,18 @@
         android:theme="@style/Theme.Hgs">
 
         <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="Enables 3rd party launcher gestures on HyperOS" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="101" />
+
+        <meta-data
             android:name="xposedscope"
-            android:value="android;com.android.systemui;com.sah.hgs" />
+            android:value="android;com.android.systemui;com.sah.hgs;com.miui.home" />
 
         <activity
             android:name=".main"
